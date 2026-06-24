@@ -1,0 +1,267 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #9f9df3;
+  --color-accent: #ff9bb3;
+  --color-success: #c9ebca;
+  --color-background: #d5d6f2;
+  --color-dark: #6353ac;
+  --color-white: #ffffff;
+  --color-text-main: #3d2e7c;
+  --color-text-sub: #6353ac;
+  --color-success-text: #2d5e30;
+  --color-error-text: #8b2040;
+  --color-border: #c8c9e8;
+
+  /* Typography scale — rem 随 html 根字号缩放（平板放大、PC 不放大） */
+  --fs-l1: 1.375rem;
+  --fs-l2: 1.125rem;
+  --fs-l3: 1.0625rem;
+  --fs-l4: 0.9375rem;
+  --fs-question: 1.1875rem;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+html {
+  /* 手机 16px；触控大屏 24px；仅鼠标桌面才回落 17px */
+  font-size: 16px;
+  min-height: 100%;
+  height: auto;
+  overflow-y: auto;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 平板 / 触屏：不论横竖屏多宽，都保持大字号 */
+@media (min-width: 768px),
+  ((pointer: coarse) and (min-width: 560px)) {
+  html {
+    font-size: 24px;
+  }
+}
+
+/* 仅真正的鼠标桌面才缩小字号（避免 1200×2000 横屏 2000px 宽误伤） */
+@media (min-width: 1280px) and (hover: hover) and (pointer: fine) {
+  html {
+    font-size: 17px;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  height: auto;
+  overflow-y: auto;
+  background-image: url('/bg.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: scroll;
+  color: #3d2e7c;
+  font-size: var(--fs-l3);
+  line-height: 1.6;
+  font-weight: 400;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    'PingFang SC',
+    'Hiragino Sans GB',
+    'Microsoft YaHei',
+    sans-serif;
+}
+
+#root {
+  min-height: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* L1 页面标题 | L2 区块标题 | L3 正文 | L4 辅助 | text-question 题目强调 */
+.text-l1 {
+  font-size: var(--fs-l1);
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.text-l2 {
+  font-size: var(--fs-l2);
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.text-l3 {
+  font-size: var(--fs-l3);
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+.text-l4 {
+  font-size: var(--fs-l4);
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+.text-question {
+  font-size: var(--fs-question);
+  line-height: 1.75;
+  font-weight: 600;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--color-text-main);
+}
+
+/* Force bold to render correctly on Android */
+.font-bold,
+.font-semibold,
+.font-medium,
+.text-l1,
+.text-l2,
+.text-question,
+[class*='font-'] {
+  font-weight: 700 !important;
+  -webkit-text-stroke: 0.01em transparent;
+}
+
+@layer components {
+  .app-page {
+    flex: 1;
+    min-height: 100dvh;
+    min-height: 100svh;
+    padding-bottom: 2rem;
+    overflow-x: hidden;
+    overflow-y: visible;
+  }
+
+  /* 平板铺满宽度、少留白；仅鼠标桌面才限制最大宽度居中 */
+  .app-container {
+    width: 100%;
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+
+  .app-card {
+    border-radius: 16px;
+    background-color: var(--color-white);
+    box-shadow: 0 4px 16px rgba(99, 83, 172, 0.08);
+  }
+
+  .app-heading {
+    color: var(--color-text-main);
+    font-size: var(--fs-l1);
+    line-height: 1.35;
+    font-weight: 600;
+  }
+
+  .app-body {
+    color: var(--color-text-main);
+    font-size: var(--fs-l3);
+  }
+
+  .app-secondary {
+    color: var(--color-text-sub);
+    font-size: var(--fs-l4);
+  }
+
+  .app-btn-primary {
+    border-radius: 16px;
+    background-color: var(--color-primary);
+    color: var(--color-white);
+    font-size: var(--fs-l3);
+    font-weight: 600;
+  }
+
+  .app-btn-primary:hover {
+    filter: brightness(1.05);
+  }
+
+  .app-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .app-btn-dark {
+    border-radius: 16px;
+    background-color: var(--color-dark);
+    color: var(--color-white);
+    font-size: var(--fs-l3);
+    font-weight: 600;
+  }
+
+  .app-btn-dark:hover {
+    filter: brightness(1.08);
+  }
+
+  .app-btn-outline {
+    border-radius: 16px;
+    border: 2px solid var(--color-primary);
+    background-color: var(--color-white);
+    color: var(--color-primary);
+    font-size: var(--fs-l3);
+    font-weight: 600;
+  }
+
+  .app-btn-outline:hover {
+    background-color: rgba(159, 157, 243, 0.1);
+  }
+}
+
+/* 平板 / 触屏：适中边距（约 30px） */
+@media (min-width: 768px),
+  ((pointer: coarse) and (min-width: 560px)) {
+  .app-container {
+    max-width: none;
+    padding-inline: 1.25rem;
+  }
+}
+
+/* 鼠标 PC：更宽边距 */
+@media (min-width: 1280px) and (hover: hover) and (pointer: fine) {
+  .app-container {
+    padding-inline: 3rem;
+  }
+
+  .app-container--narrow {
+    max-width: 40rem;
+  }
+}
+
+/* 超宽 PC 屏幕：内容区居中，两侧留白更大 */
+@media (min-width: 1600px) and (hover: hover) and (pointer: fine) {
+  .app-container {
+    max-width: 56rem;
+  }
+}
+
+@media (min-width: 768px) {
+  input[type='text'],
+  input[type='number'],
+  textarea {
+    font-size: var(--fs-l3) !important;
+    padding: 0.55rem 0.75rem !important;
+    min-height: 2.75rem;
+  }
+
+  input[inputmode='decimal'] {
+    min-height: 2.25rem !important;
+    min-width: 5rem !important;
+    padding: 0.2rem 0.35rem !important;
+  }
+
+  button {
+    font-size: var(--fs-l3) !important;
+    min-height: 2.75rem;
+  }
+}
