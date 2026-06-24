@@ -11,6 +11,7 @@ import Reflection from './pages/Reflection'
 export default function App() {
   return (
     <BrowserRouter
+      basename={import.meta.env.BASE_URL.replace(/\/$/, '') || undefined}
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <ScrollToTop />
