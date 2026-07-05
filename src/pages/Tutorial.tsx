@@ -8,6 +8,16 @@ export default function Tutorial() {
   const navigate = useNavigate()
   const tutorialQuestion = useMemo(() => getTutorialQuestion(), [])
 
+  const [step1Hint] = useState(
+    '找找题目里有几个数字？哪个是铅笔的数量，哪个是总价格？',
+  )
+  const [step2Hint] = useState(
+    '先用总价格 ÷ 铅笔数量，算出每支铅笔的价格。再用每支价格 × 要买的数量，就是所求总价。',
+  )
+  const [step3Hint] = useState(
+    '用每支铅笔的价格乘以16，在草稿纸上算出总共需要多少钱。',
+  )
+
   const [scaffoldKey, setScaffoldKey] = useState(0)
   const [completed, setCompleted] = useState(false)
   const [lastWrong, setLastWrong] = useState(false)
@@ -63,6 +73,11 @@ export default function Tutorial() {
           question={tutorialQuestion}
           condition="fading"
           forcedFadingStage="full_support"
+          fixedHints={{
+            step1: step1Hint,
+            step2: step2Hint,
+            step3: step3Hint,
+          }}
           onSubmit={handleSubmit}
         />
 

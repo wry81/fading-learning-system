@@ -19,11 +19,18 @@ import {
 } from '../utils/step2Formula'
 import type { FadingStage, StudyCondition } from '../types'
 
+export type FixedTutorialHints = {
+  step1: string
+  step2: string
+  step3?: string
+}
+
 export type StepScaffoldProps = {
   question: QuestionData
   condition: StudyCondition
   onSubmit: (answer: number) => void
   forcedFadingStage?: FadingStage
+  fixedHints?: FixedTutorialHints
 }
 
 type HintCardMeta = {
@@ -256,6 +263,7 @@ export default function StepScaffold({
   condition,
   onSubmit,
   forcedFadingStage,
+  fixedHints,
 }: StepScaffoldProps) {
   const storeFadingStage = useLearningStore((s) => s.fadingStage)
   const fadingStage = forcedFadingStage ?? storeFadingStage
@@ -270,9 +278,9 @@ export default function StepScaffold({
     initEmptyStep2Slots(question),
   )
 
-  const [step1Hint, setStep1Hint] = useState('')
-  const [step2Hint, setStep2Hint] = useState('')
-  const [step3Hint, setStep3Hint] = useState('')
+  const [step1Hint, setStep1Hint] = useState(fixedHints?.step1 ?? '')
+  const [step2Hint, setStep2Hint] = useState(fixedHints?.step2 ?? '')
+  const [step3Hint, setStep3Hint] = useState(fixedHints?.step3 ?? '')
   const [isLoadingStep1, setIsLoadingStep1] = useState(false)
   const [isLoadingStep2, setIsLoadingStep2] = useState(false)
   const [isLoadingStep3, setIsLoadingStep3] = useState(false)
@@ -292,6 +300,7 @@ export default function StepScaffold({
   const meta = hintMetaFor(condition, stageForMeta)
 
   useEffect(() => {
+    if (fixedHints) return
     if (!showAi) return
 
     let cancelled = false
@@ -325,11 +334,15 @@ export default function StepScaffold({
     return () => {
       cancelled = true
     }
-  }, [question.id, showAi, fadingStage, condition])
+  }, [question.id, showAi, fadingStage, condition, fixedHints])
 
   const runCheckStep1 = useCallback(async () => {
     setIsLoadingStep1(true)
     try {
+      if (fixedHints) {
+        setStep1Hint(fixedHints.step1)
+        return
+      }
       const flat = alignStudentToExpected(
         step1SlotValues.flatMap((row) => [...row]),
         question.expectedStep1Values.length,
@@ -345,11 +358,15 @@ export default function StepScaffold({
       setStep1CheckCount((c) => c + 1)
       setIsLoadingStep1(false)
     }
-  }, [condition, fadingStage, question, step1SlotValues])
+  }, [condition, fadingStage, question, step1SlotValues, fixedHints])
 
   const runCheckStep2 = useCallback(async () => {
     setIsLoadingStep2(true)
     try {
+      if (fixedHints) {
+        setStep2Hint(fixedHints.step2)
+        return
+      }
       const flat = alignStudentToExpected(
         step2SlotValues.flatMap((row) => [...row]),
         step2ExpectedValues.length,
@@ -365,14 +382,14 @@ export default function StepScaffold({
       setStep2CheckCount((c) => c + 1)
       setIsLoadingStep2(false)
     }
-  }, [condition, fadingStage, question, step2ExpectedValues, step2SlotValues])
+  }, [condition, fadingStage, question, step2ExpectedValues, step2SlotValues, fixedHints])
 
   useEffect(() => {
     setNumericAnswer('')
     setSubmitted(false)
-    setStep1Hint('')
-    setStep2Hint('')
-    setStep3Hint('')
+    setStep1Hint(fixedHints?.step1 ?? '')
+    setStep2Hint(fixedHints?.step2 ?? '')
+    setStep3Hint(fixedHints?.step3 ?? '')
     setIsLoadingStep1(false)
     setIsLoadingStep2(false)
     setIsLoadingStep3(false)
@@ -380,7 +397,7 @@ export default function StepScaffold({
     setStep2CheckCount(0)
     setStep1SlotValues(initSlotRows(question.step1Hints))
     setStep2SlotValues(initEmptyStep2Slots(question))
-  }, [question.id])
+  }, [question.id, fixedHints])
 
   const displayStep1Hint = useMemo(() => {
     if (condition === 'fading' && fadingStage === 'minimal' && step1Hint) {

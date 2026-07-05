@@ -680,3 +680,18 @@ export async function generateStep2Hint(
     return '暂时无法获取提示，请稍后再试。'
   }
 }
+
+/** Tutorial — Step 1 读题理解（固定引导，不调 API） */
+export async function generateTutorialStep1Hint(): Promise<string> {
+  return '找找题目里有几个数字？哪个是铅笔的数量，哪个是总价格？'
+}
+
+/** Tutorial — Step 2 列框架（固定引导，不调 API） */
+export async function generateTutorialStep2Hint(): Promise<string> {
+  return '先用总价格 ÷ 铅笔数量，算出每支铅笔的价格。再用每支价格 × 要买的数量，就是所求总价。'
+}
+
+/** Tutorial — Step 3 草稿计算 */
+export async function generateTutorialStep3Hint(): Promise<string> {
+  return '用每支铅笔的价格乘以16，在草稿纸上算出总共需要多少钱。'
+}
