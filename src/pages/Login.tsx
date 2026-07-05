@@ -67,7 +67,7 @@ export default function Login() {
     setCondition(p.condition)
     initBKT(0)
     startLearningSession()
-    navigate('/home')
+    navigate('/tutorial')
   }
 
   const startReturning = (id: string) => {

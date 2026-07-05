@@ -9,6 +9,11 @@ export interface HasTimeGapMeta {
   hasTimeGap: boolean
 }
 
+/** Practice question shown before the formal experiment (not counted in BKT) */
+export interface TutorialQuestionMeta {
+  isTutorial?: boolean
+}
+
 export interface Question {
   id: string
   type: 'multiple_choice'

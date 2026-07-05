@@ -23,6 +23,7 @@ export type StepScaffoldProps = {
   question: QuestionData
   condition: StudyCondition
   onSubmit: (answer: number) => void
+  forcedFadingStage?: FadingStage
 }
 
 type HintCardMeta = {
@@ -250,8 +251,14 @@ async function fetchInitialStep2Hint(
   return generateStep2InitialHint(question, fadingStage, condition)
 }
 
-export default function StepScaffold({ question, condition, onSubmit }: StepScaffoldProps) {
-  const fadingStage = useLearningStore((s) => s.fadingStage)
+export default function StepScaffold({
+  question,
+  condition,
+  onSubmit,
+  forcedFadingStage,
+}: StepScaffoldProps) {
+  const storeFadingStage = useLearningStore((s) => s.fadingStage)
+  const fadingStage = forcedFadingStage ?? storeFadingStage
 
   const [numericAnswer, setNumericAnswer] = useState('')
   const [submitted, setSubmitted] = useState(false)

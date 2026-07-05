@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-import { questions } from '../data/questions'
+import { experimentQuestions } from '../data/questions'
 import {
   DEFAULT_BKT_PARAMS,
   pretestToPL0,
@@ -287,9 +287,7 @@ export const useLearningStore = create<LearningState>((set, get) => ({
 
     const currentQuestion =
       state.currentSkillType != null
-        ? questions.filter((q) => q.skillType === state.currentSkillType)[
-            state.currentQuestionIndex
-          ]
+        ? experimentQuestions(state.currentSkillType)[state.currentQuestionIndex]
         : undefined
 
     console.log('[BKT Debug]', {

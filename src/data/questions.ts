@@ -1,11 +1,11 @@
-import type { HasTimeGapMeta, SkillType } from '../types'
+import type { HasTimeGapMeta, SkillType, TutorialQuestionMeta } from '../types'
 
-export interface QuestionData extends HasTimeGapMeta {
+export interface QuestionData extends HasTimeGapMeta, TutorialQuestionMeta {
   id: string
   type: 'fill_in_blank'
   subject: string
   skillType: SkillType
-  difficulty: 1 | 2 | 3 | 4 | 5
+  difficulty: 0 | 1 | 2 | 3 | 4 | 5
   content: string
   step1Hints: string[]
   step2Hints: string[]
@@ -18,6 +18,27 @@ export interface QuestionData extends HasTimeGapMeta {
 }
 
 export const questions: QuestionData[] = [
+  {
+    id: 'tutorial1',
+    type: 'fill_in_blank',
+    subject: '练习题',
+    skillType: '求时间',
+    difficulty: 0,
+    isTutorial: true,
+    hasTimeGap: false,
+    content: '买5支铅笔要10元钱，买同样的铅笔16支，需要多少钱？',
+    step1Hints: ['铅笔数量：___ 支', '总价格：___ 元'],
+    step2Hints: [
+      '每支铅笔价格 = （___） ÷ （___）',
+      '所求总价 = （___） × （___）',
+    ],
+    answerUnit: '元',
+    correctAnswer: 32,
+    answerLabel: '买16支铅笔需要___元',
+    expectedStep1Values: ['5', '10'],
+    expectedStep2Values: ['10', '5', '2', '16'],
+  },
+
   {
     id: 't001',
     type: 'fill_in_blank',
@@ -406,3 +427,15 @@ export const questions: QuestionData[] = [
     ],
   }
 ]
+
+export function experimentQuestions(skillType: SkillType): QuestionData[] {
+  return questions.filter((q) => !q.isTutorial && q.skillType === skillType)
+}
+
+export function getTutorialQuestion(): QuestionData {
+  const tutorial = questions.find((q) => q.isTutorial)
+  if (!tutorial) {
+    throw new Error('Tutorial question not found')
+  }
+  return tutorial
+}

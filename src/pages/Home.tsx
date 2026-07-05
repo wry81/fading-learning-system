@@ -3,17 +3,17 @@ import { useNavigate } from 'react-router-dom'
 
 import AbilityHistory from '../components/AbilityHistory'
 import FadingIndicator from '../components/FadingIndicator'
-import { questions } from '../data/questions'
+import { experimentQuestions } from '../data/questions'
 import distanceIcon from '../assets/distance.svg'
 import timeIcon from '../assets/time.svg'
-import skillIcon from '../assets/skill.svg'
+import skillIcon from '../assets/home.svg'
 import { useLearningStore, ensureSkillStates } from '../store/learningStore'
 import { useParticipantStore } from '../store/participantStore'
 import type { SkillType } from '../types'
 
 const QUESTIONS_PER_SKILL: Record<SkillType, number> = {
-  求时间: questions.filter((q) => q.skillType === '求时间').length,
-  求路程: questions.filter((q) => q.skillType === '求路程').length,
+  求时间: experimentQuestions('求时间').length,
+  求路程: experimentQuestions('求路程').length,
 }
 
 type SkillModule = {
@@ -211,7 +211,7 @@ export default function Home() {
         <section className="rounded-2xl bg-[#FFFFFF]/80 p-5 shadow-sm">
           <h2 className="text-l2 flex items-center gap-2 text-[#2D2D2D]">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#9F9DF3]/50">
-              <img src={skillIcon} width="35" height="35" alt="能力" />
+              <img src={skillIcon} width="30" height="30" alt="能力" />
             </span>
             当前能力
           </h2>

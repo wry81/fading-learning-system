@@ -7,6 +7,7 @@ import Home from './pages/Home'
 import Learning from './pages/Learning'
 import Login from './pages/Login'
 import Reflection from './pages/Reflection'
+import Tutorial from './pages/Tutorial'
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<Login />} />
+        <Route path="/tutorial" element={<Tutorial />} />
         <Route path="/home" element={<Home />} />
         <Route path="/learning" element={<Learning />} />
         <Route path="/reflection" element={<Reflection />} />

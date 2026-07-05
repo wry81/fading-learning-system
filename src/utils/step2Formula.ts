@@ -7,7 +7,19 @@ export type Step2FormulaRow = {
   operator: string
 }
 
+function parseStep2HintLine(line: string): Step2FormulaRow | null {
+  const m = line.match(/^(.+?)\s*=\s*（___）\s*([+\-×÷])\s*（___）/)
+  if (!m) return null
+  return { leftLabel: m[1]!.trim(), operator: m[2]! }
+}
+
 export function getStep2FormulaRows(question: QuestionData): Step2FormulaRow[] {
+  if (question.isTutorial) {
+    return question.step2Hints
+      .map(parseStep2HintLine)
+      .filter((row): row is Step2FormulaRow => row != null)
+  }
+
   const { skillType, hasTimeGap } = question
 
   if (skillType === '求时间') {
@@ -44,6 +56,10 @@ export function initEmptyStep2Slots(question: QuestionData): string[][] {
 
 /** Flat expected values for each blank, left-to-right, top-to-bottom. */
 export function getStep2ExpectedValues(question: QuestionData): string[] {
+  if (question.isTutorial) {
+    return question.expectedStep2Values
+  }
+
   const { skillType, hasTimeGap } = question
 
   if (skillType === '求时间') {

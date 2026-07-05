@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import FadingIndicator from '../components/FadingIndicator'
 import LevelUpAnimation from '../components/LevelUpAnimation'
 import StepScaffold from '../components/StepScaffold'
-import { questions } from '../data/questions'
+import { experimentQuestions } from '../data/questions'
 import { useLearningStore } from '../store/learningStore'
 import type { FadingStage, SkillType, StudyCondition } from '../types'
 
@@ -23,10 +23,7 @@ export default function Learning() {
   const loadActiveSkill = useLearningStore((s) => s.loadActiveSkill)
 
   const filteredQuestions = useMemo(
-    () =>
-      currentSkillType
-        ? questions.filter((q) => q.skillType === currentSkillType)
-        : [],
+    () => (currentSkillType ? experimentQuestions(currentSkillType) : []),
     [currentSkillType],
   )
 

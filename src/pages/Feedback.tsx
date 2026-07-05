@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import FadingIndicator from '../components/FadingIndicator'
-import { questions } from '../data/questions'
+import { experimentQuestions } from '../data/questions'
 import { useLearningStore } from '../store/learningStore'
 import type { FadingStage } from '../types'
 
@@ -48,8 +48,8 @@ export default function Feedback() {
   const currentQuestionIndex = useLearningStore((s) => s.currentQuestionIndex)
 
   const filteredQuestions = currentSkillType
-    ? questions.filter((q) => q.skillType === currentSkillType)
-    : questions
+    ? experimentQuestions(currentSkillType)
+    : []
 
   const isCorrect = state?.isCorrect ?? false
   const correctAnswer = state?.correctAnswer ?? '未知'
