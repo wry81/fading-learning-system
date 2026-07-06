@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { QuestionData } from '../data/questions'
 import { useLearningStore } from '../store/learningStore'
@@ -250,7 +250,7 @@ function MoreHintButton({
   return (
     <button
       type="button"
-      className="mt-2 rounded-[20px] border border-[#9F9DF3] bg-transparent px-3 py-1 text-xs text-[#9F9DF3] hover:bg-[#9F9DF3]/10 disabled:cursor-not-allowed disabled:opacity-50"
+      className="rounded-[20px] border border-[#9F9DF3] bg-transparent px-3 py-1 text-xs text-[#9F9DF3] hover:bg-[#9F9DF3]/10 disabled:cursor-not-allowed disabled:opacity-50"
       onClick={onClick}
       disabled={disabled}
     >
@@ -259,18 +259,57 @@ function MoreHintButton({
   )
 }
 
+const checkHintButtonClass =
+  'rounded-2xl bg-[#FF9BB3]/30 px-4 py-2 text-l3 font-semibold text-[#2D2D2D]/60 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 border border-[#FF9BB3]/40 border-1'
+
+function HintActionRow({
+  showEscalation,
+  onEscalate,
+  escalateDisabled,
+  showCheck,
+  onCheck,
+  checkDisabled,
+  checkLabel,
+}: {
+  showEscalation: boolean
+  onEscalate: () => void
+  escalateDisabled?: boolean
+  showCheck?: boolean
+  onCheck?: () => void
+  checkDisabled?: boolean
+  checkLabel?: string
+}) {
+  if (!showEscalation && !showCheck) return null
+
+  return (
+    <div className="mt-3 flex items-center gap-3">
+      {showEscalation ? (
+        <MoreHintButton onClick={onEscalate} disabled={escalateDisabled} />
+      ) : null}
+      {showCheck ? (
+        <button
+          type="button"
+          className={[checkHintButtonClass, 'ml-auto'].join(' ')}
+          onClick={onCheck}
+          disabled={checkDisabled}
+        >
+          {checkLabel}
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
 function AiHintPanel({
   meta,
   isLoading,
   displayText,
   badge,
-  escalationButton,
 }: {
   meta: HintCardMeta
   isLoading: boolean
   displayText: string
   badge?: 'partial' | 'full_support' | null
-  escalationButton?: ReactNode
 }) {
   return (
     <div className="mt-4">
@@ -294,7 +333,6 @@ function AiHintPanel({
           <div className="mt-3 text-l4 text-[#6353AC]"> </div>
         )}
       </div>
-      {escalationButton}
     </div>
   )
 }
@@ -693,33 +731,23 @@ export default function StepScaffold({
           />
 
           {showHintSection ? (
-            <AiHintPanel
-              meta={meta}
-              isLoading={isLoadingStep1}
-              displayText={displayStep1Hint}
-              badge={step1EscalationBadge}
-              escalationButton={
-                showStep1EscalationButton ? (
-                  <MoreHintButton
-                    onClick={() => void escalateStep1Hint()}
-                    disabled={isLoadingStep1}
-                  />
-                ) : null
-              }
-            />
-          ) : null}
-
-          {showHintSection ? (
-            <div className="mt-3">
-              <button
-                type="button"
-                className="rounded-2xl bg-[#FF9BB3]/30 px-4 py-2 text-l3 font-semibold text-[#2D2D2D]/60 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 border border-[#FF9BB3]/40 border-1"
-                onClick={() => void runCheckStep1()}
-                disabled={isLoadingStep1}
-              >
-                {step1CheckCount > 0 ? '重新检查' : '检查一下'}
-              </button>
-            </div>
+            <>
+              <AiHintPanel
+                meta={meta}
+                isLoading={isLoadingStep1}
+                displayText={displayStep1Hint}
+                badge={step1EscalationBadge}
+              />
+              <HintActionRow
+                showEscalation={showStep1EscalationButton}
+                onEscalate={() => void escalateStep1Hint()}
+                escalateDisabled={isLoadingStep1}
+                showCheck
+                onCheck={() => void runCheckStep1()}
+                checkDisabled={isLoadingStep1}
+                checkLabel={step1CheckCount > 0 ? '重新检查' : '检查一下'}
+              />
+            </>
           ) : null}
         </div>
 
@@ -733,33 +761,23 @@ export default function StepScaffold({
           />
 
           {showHintSection ? (
-            <AiHintPanel
-              meta={meta}
-              isLoading={isLoadingStep2}
-              displayText={displayStep2Hint}
-              badge={step2EscalationBadge}
-              escalationButton={
-                showStep2EscalationButton ? (
-                  <MoreHintButton
-                    onClick={() => void escalateStep2Hint()}
-                    disabled={isLoadingStep2}
-                  />
-                ) : null
-              }
-            />
-          ) : null}
-
-          {showHintSection ? (
-            <div className="mt-3">
-              <button
-                type="button"
-                className="rounded-2xl bg-[#FF9BB3]/30 px-4 py-2 text-l3 font-semibold text-[#2D2D2D]/60 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 border border-[#FF9BB3]/40 border-1"
-                onClick={() => void runCheckStep2()}
-                disabled={isLoadingStep2}
-              >
-                {step2CheckCount > 0 ? '重新检查' : '检查一下'}
-              </button>
-            </div>
+            <>
+              <AiHintPanel
+                meta={meta}
+                isLoading={isLoadingStep2}
+                displayText={displayStep2Hint}
+                badge={step2EscalationBadge}
+              />
+              <HintActionRow
+                showEscalation={showStep2EscalationButton}
+                onEscalate={() => void escalateStep2Hint()}
+                escalateDisabled={isLoadingStep2}
+                showCheck
+                onCheck={() => void runCheckStep2()}
+                checkDisabled={isLoadingStep2}
+                checkLabel={step2CheckCount > 0 ? '重新检查' : '检查一下'}
+              />
+            </>
           ) : null}
         </div>
 
@@ -771,20 +789,19 @@ export default function StepScaffold({
           </div>
 
           {showHintSection ? (
-            <AiHintPanel
-              meta={meta}
-              isLoading={isLoadingStep3}
-              displayText={displayStep3Hint}
-              badge={step3EscalationBadge}
-              escalationButton={
-                showStep3EscalationButton ? (
-                  <MoreHintButton
-                    onClick={() => void escalateStep3Hint()}
-                    disabled={isLoadingStep3}
-                  />
-                ) : null
-              }
-            />
+            <>
+              <AiHintPanel
+                meta={meta}
+                isLoading={isLoadingStep3}
+                displayText={displayStep3Hint}
+                badge={step3EscalationBadge}
+              />
+              <HintActionRow
+                showEscalation={showStep3EscalationButton}
+                onEscalate={() => void escalateStep3Hint()}
+                escalateDisabled={isLoadingStep3}
+              />
+            </>
           ) : null}
         </div>
 
