@@ -39,6 +39,9 @@ export interface AnswerRecord {
   reflectionText: string // content from reflection page
   pLBefore: number // P(L) before this answer (BKT)
   pLAfter: number // P(L) after this answer (BKT)
+  step1Escalations: number // how many times student escalated step1 hint
+  step2Escalations: number
+  step3Escalations: number
 }
 
 export interface FadingEvent {

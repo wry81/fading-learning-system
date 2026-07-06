@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import type { QuestionData } from '../data/questions'
 import { useLearningStore } from '../store/learningStore'
@@ -25,10 +25,16 @@ export type FixedTutorialHints = {
   step3?: string
 }
 
+export type StepSubmitMeta = {
+  step1Escalations: number
+  step2Escalations: number
+  step3Escalations: number
+}
+
 export type StepScaffoldProps = {
   question: QuestionData
   condition: StudyCondition
-  onSubmit: (answer: number) => void
+  onSubmit: (answer: number, meta: StepSubmitMeta) => void
   forcedFadingStage?: FadingStage
   fixedHints?: FixedTutorialHints
 }
@@ -37,6 +43,29 @@ type HintCardMeta = {
   accentClass: string
   title: string
   containerClass: string
+}
+
+function escalateStage(current: FadingStage): FadingStage | null {
+  if (current === 'none') return 'minimal'
+  if (current === 'minimal') return 'partial'
+  if (current === 'partial') return 'full_support'
+  if (current === 'full_support') return null
+  return null
+}
+
+function effectiveStage(
+  base: FadingStage,
+  escalated: FadingStage | null,
+): FadingStage {
+  return escalated ?? base
+}
+
+function escalationBadgeStage(
+  escalated: FadingStage | null,
+): 'partial' | 'full_support' | null {
+  if (escalated === 'partial') return 'partial'
+  if (escalated === 'full_support') return 'full_support'
+  return null
 }
 
 function firstSentenceZh(text: string): string {
@@ -73,7 +102,7 @@ const step1InputClass =
   'h-8 min-w-[60px] w-[60px] shrink-0 border-0 border-b-2 border-[#9F9DF3] bg-transparent px-0.5 text-center text-l3 text-[#2D2D2D] outline-none focus:border-[#6353AC] focus:ring-0'
 
 const step2InputClass =
-  'h-8 w-[80px] shrink-0 border-0 border-b-2 border-[#9F9DF3] bg-transparent px-0.5 text-center text-l3 text-[#2D2D2D] outline-none focus:border-[#6353AC] focus:ring-0'
+  'h-8 w-[70px] min-w-[70px] shrink-0 border-0 border-b-2 border-[#9F9DF3] bg-transparent px-0.5 text-center text-l3 text-[#2D2D2D] outline-none focus:border-[#6353AC] focus:ring-0'
 
 type FillableHintRowsProps = {
   lines: string[]
@@ -133,6 +162,7 @@ function Step2FormulaRow({
       <span>（</span>
       <input
         type="text"
+        inputMode="decimal"
         className={step2InputClass}
         placeholder=""
         value={values[0] ?? ''}
@@ -144,11 +174,24 @@ function Step2FormulaRow({
       <span>（</span>
       <input
         type="text"
+        inputMode="decimal"
         className={step2InputClass}
         placeholder=""
         value={values[1] ?? ''}
         onChange={(e) => onChange(1, e.target.value)}
         aria-label={`${leftLabel}第二个量`}
+      />
+      <span>）</span>
+      <span>=</span>
+      <span>（</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        className={step2InputClass}
+        placeholder=""
+        value={values[2] ?? ''}
+        onChange={(e) => onChange(2, e.target.value)}
+        aria-label={`${leftLabel}结果`}
       />
       <span>）</span>
     </div>
@@ -173,7 +216,7 @@ function Step2FrameworkPanel({
           key={row.leftLabel}
           leftLabel={row.leftLabel}
           operator={row.operator}
-          values={values[lineIndex] ?? ['', '']}
+          values={values[lineIndex] ?? ['', '', '']}
           onChange={(slotIndex, value) => onSlotChange(lineIndex, slotIndex, value)}
         />
       ))}
@@ -182,34 +225,76 @@ function Step2FrameworkPanel({
   )
 }
 
+function EscalationBadge({ stage }: { stage: 'partial' | 'full_support' }) {
+  if (stage === 'partial') {
+    return (
+      <span className="mb-2 inline-flex rounded-full bg-[#C9EBCA] px-2.5 py-0.5 text-xs font-medium text-[#2D5E30]">
+        部分辅助
+      </span>
+    )
+  }
+  return (
+    <span className="mb-2 inline-flex rounded-full bg-[#9F9DF3] px-2.5 py-0.5 text-xs font-medium text-white">
+      全力辅助
+    </span>
+  )
+}
+
+function MoreHintButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      className="mt-2 rounded-[20px] border border-[#9F9DF3] bg-transparent px-3 py-1 text-xs text-[#9F9DF3] hover:bg-[#9F9DF3]/10 disabled:cursor-not-allowed disabled:opacity-50"
+      onClick={onClick}
+      disabled={disabled}
+    >
+      我需要更多提示 ↑
+    </button>
+  )
+}
+
 function AiHintPanel({
   meta,
   isLoading,
   displayText,
+  badge,
+  escalationButton,
 }: {
   meta: HintCardMeta
   isLoading: boolean
   displayText: string
+  badge?: 'partial' | 'full_support' | null
+  escalationButton?: ReactNode
 }) {
   return (
-    <div
-      className={[
-        'mt-4 min-h-[3.5rem] rounded-2xl border border-[#C8C9E8] p-4',
-        meta.accentClass,
-        meta.containerClass,
-      ].join(' ')}
-    >
-      <div className="text-l2 text-[#2D2D2D]">{meta.title}</div>
-      {isLoading ? (
-        <div className="mt-3 flex items-center text-l3 text-[#9F9DF3]">
-          <span>AI思考中...</span>
-          <ThinkingDots />
-        </div>
-      ) : displayText ? (
-        <div className="mt-3 whitespace-pre-wrap text-l3 text-[#2D2D2D]">{displayText}</div>
-      ) : (
-        <div className="mt-3 text-l4 text-[#6353AC]"> </div>
-      )}
+    <div className="mt-4">
+      {badge ? <EscalationBadge stage={badge} /> : null}
+      <div
+        className={[
+          'min-h-[3.5rem] rounded-2xl border border-[#C8C9E8] p-4',
+          meta.accentClass,
+          meta.containerClass,
+        ].join(' ')}
+      >
+        <div className="text-l2 text-[#2D2D2D]">{meta.title}</div>
+        {isLoading ? (
+          <div className="mt-3 flex items-center text-l3 text-[#9F9DF3]">
+            <span>AI思考中...</span>
+            <ThinkingDots />
+          </div>
+        ) : displayText ? (
+          <div className="mt-3 whitespace-pre-wrap text-l3 text-[#2D2D2D]">{displayText}</div>
+        ) : (
+          <div className="mt-3 text-l4 text-[#6353AC]"> </div>
+        )}
+      </div>
+      {escalationButton}
     </div>
   )
 }
@@ -288,20 +373,32 @@ export default function StepScaffold({
   const [step1CheckCount, setStep1CheckCount] = useState(0)
   const [step2CheckCount, setStep2CheckCount] = useState(0)
 
+  const [step1EscalatedStage, setStep1EscalatedStage] = useState<FadingStage | null>(null)
+  const [step2EscalatedStage, setStep2EscalatedStage] = useState<FadingStage | null>(null)
+  const [step3EscalatedStage, setStep3EscalatedStage] = useState<FadingStage | null>(null)
+  const [step1Escalations, setStep1Escalations] = useState(0)
+  const [step2Escalations, setStep2Escalations] = useState(0)
+  const [step3Escalations, setStep3Escalations] = useState(0)
+
   const canUseAi = condition !== 'no_ai'
-  const fadingNone = condition === 'fading' && fadingStage === 'none'
-  const showAi = canUseAi && !fadingNone
+  const canEscalateHints = condition === 'fading' && !fixedHints
+  const showHintSection = canUseAi
+
+  const step1EffectiveStage = effectiveStage(fadingStage, step1EscalatedStage)
+  const step2EffectiveStage = effectiveStage(fadingStage, step2EscalatedStage)
+  const step3EffectiveStage = effectiveStage(fadingStage, step3EscalatedStage)
+
+  const shouldLoadInitialHints =
+    !fixedHints && showHintSection && (condition !== 'fading' || fadingStage !== 'none')
 
   const step2ExpectedValues = useMemo(() => getStep2ExpectedValues(question), [question])
-
-  const showStep2Ai = canUseAi && !(condition === 'fading' && fadingStage === 'none')
 
   const stageForMeta: FadingStage = condition === 'fading' ? fadingStage : 'partial'
   const meta = hintMetaFor(condition, stageForMeta)
 
   useEffect(() => {
     if (fixedHints) return
-    if (!showAi) return
+    if (!shouldLoadInitialHints) return
 
     let cancelled = false
     setIsLoadingStep1(true)
@@ -334,7 +431,104 @@ export default function StepScaffold({
     return () => {
       cancelled = true
     }
-  }, [question.id, showAi, fadingStage, condition, fixedHints])
+  }, [question.id, shouldLoadInitialHints, fadingStage, condition, fixedHints, question])
+
+  const regenerateStep1Hint = useCallback(
+    async (stage: FadingStage) => {
+      if (fixedHints) {
+        setStep1Hint(fixedHints.step1)
+        return
+      }
+      setIsLoadingStep1(true)
+      try {
+        const flat = alignStudentToExpected(
+          step1SlotValues.flatMap((row) => [...row]),
+          question.expectedStep1Values.length,
+        )
+        const hasInput = flat.some((s) => String(s).trim())
+        if (hasInput) {
+          const flags = checkHintInputs(flat, question.expectedStep1Values)
+          const text = await generateStep1Hint(question, stage, flat, flags, condition)
+          setStep1Hint(text)
+        } else {
+          const text = await fetchInitialStep1Hint(question, stage, condition)
+          setStep1Hint(text)
+        }
+      } finally {
+        setIsLoadingStep1(false)
+      }
+    },
+    [condition, fixedHints, question, step1SlotValues],
+  )
+
+  const regenerateStep2Hint = useCallback(
+    async (stage: FadingStage) => {
+      if (fixedHints) {
+        setStep2Hint(fixedHints.step2)
+        return
+      }
+      setIsLoadingStep2(true)
+      try {
+        const flat = alignStudentToExpected(
+          step2SlotValues.flatMap((row) => [...row]),
+          step2ExpectedValues.length,
+        )
+        const hasInput = flat.some((s) => String(s).trim())
+        if (hasInput) {
+          const flags = checkHintInputs(flat, step2ExpectedValues)
+          const text = await generateStep2Hint(question, stage, flat, flags, condition)
+          setStep2Hint(text)
+        } else {
+          const text = await fetchInitialStep2Hint(question, stage, condition)
+          setStep2Hint(text)
+        }
+      } finally {
+        setIsLoadingStep2(false)
+      }
+    },
+    [condition, fixedHints, question, step2ExpectedValues, step2SlotValues],
+  )
+
+  const regenerateStep3Hint = useCallback(
+    async (stage: FadingStage) => {
+      if (fixedHints) {
+        setStep3Hint(fixedHints.step3 ?? '')
+        return
+      }
+      setIsLoadingStep3(true)
+      try {
+        const text = await generateStep3Hint(question, stage, condition)
+        setStep3Hint(text)
+      } finally {
+        setIsLoadingStep3(false)
+      }
+    },
+    [condition, fixedHints, question],
+  )
+
+  const escalateStep1Hint = useCallback(async () => {
+    const next = escalateStage(step1EffectiveStage)
+    if (!next) return
+    setStep1EscalatedStage(next)
+    setStep1Escalations((c) => c + 1)
+    await regenerateStep1Hint(next)
+  }, [regenerateStep1Hint, step1EffectiveStage])
+
+  const escalateStep2Hint = useCallback(async () => {
+    const next = escalateStage(step2EffectiveStage)
+    if (!next) return
+    setStep2EscalatedStage(next)
+    setStep2Escalations((c) => c + 1)
+    await regenerateStep2Hint(next)
+  }, [regenerateStep2Hint, step2EffectiveStage])
+
+  const escalateStep3Hint = useCallback(async () => {
+    const next = escalateStage(step3EffectiveStage)
+    if (!next) return
+    setStep3EscalatedStage(next)
+    setStep3Escalations((c) => c + 1)
+    await regenerateStep3Hint(next)
+  }, [regenerateStep3Hint, step3EffectiveStage])
 
   const runCheckStep1 = useCallback(async () => {
     setIsLoadingStep1(true)
@@ -352,13 +546,19 @@ export default function StepScaffold({
         return
       }
       const flags = checkHintInputs(flat, question.expectedStep1Values)
-      const text = await generateStep1Hint(question, fadingStage, flat, flags, condition)
+      const text = await generateStep1Hint(
+        question,
+        step1EffectiveStage,
+        flat,
+        flags,
+        condition,
+      )
       setStep1Hint(text)
     } finally {
       setStep1CheckCount((c) => c + 1)
       setIsLoadingStep1(false)
     }
-  }, [condition, fadingStage, question, step1SlotValues, fixedHints])
+  }, [condition, step1EffectiveStage, question, step1SlotValues, fixedHints])
 
   const runCheckStep2 = useCallback(async () => {
     setIsLoadingStep2(true)
@@ -376,13 +576,19 @@ export default function StepScaffold({
         return
       }
       const flags = checkHintInputs(flat, step2ExpectedValues)
-      const text = await generateStep2Hint(question, fadingStage, flat, flags, condition)
+      const text = await generateStep2Hint(
+        question,
+        step2EffectiveStage,
+        flat,
+        flags,
+        condition,
+      )
       setStep2Hint(text)
     } finally {
       setStep2CheckCount((c) => c + 1)
       setIsLoadingStep2(false)
     }
-  }, [condition, fadingStage, question, step2ExpectedValues, step2SlotValues, fixedHints])
+  }, [condition, step2EffectiveStage, question, step2ExpectedValues, step2SlotValues, fixedHints])
 
   useEffect(() => {
     setNumericAnswer('')
@@ -395,30 +601,47 @@ export default function StepScaffold({
     setIsLoadingStep3(false)
     setStep1CheckCount(0)
     setStep2CheckCount(0)
+    setStep1EscalatedStage(null)
+    setStep2EscalatedStage(null)
+    setStep3EscalatedStage(null)
+    setStep1Escalations(0)
+    setStep2Escalations(0)
+    setStep3Escalations(0)
     setStep1SlotValues(initSlotRows(question.step1Hints))
     setStep2SlotValues(initEmptyStep2Slots(question))
   }, [question.id, fixedHints])
 
   const displayStep1Hint = useMemo(() => {
-    if (condition === 'fading' && fadingStage === 'minimal' && step1Hint) {
+    if (condition === 'fading' && step1EffectiveStage === 'minimal' && step1Hint) {
       return firstSentenceZh(step1Hint)
     }
     return step1Hint
-  }, [condition, fadingStage, step1Hint])
+  }, [condition, step1EffectiveStage, step1Hint])
 
   const displayStep2Hint = useMemo(() => {
-    if (condition === 'fading' && fadingStage === 'minimal' && step2Hint) {
+    if (condition === 'fading' && step2EffectiveStage === 'minimal' && step2Hint) {
       return firstSentenceZh(step2Hint)
     }
     return step2Hint
-  }, [condition, fadingStage, step2Hint])
+  }, [condition, step2EffectiveStage, step2Hint])
 
   const displayStep3Hint = useMemo(() => {
-    if (condition === 'fading' && fadingStage === 'minimal' && step3Hint) {
+    if (condition === 'fading' && step3EffectiveStage === 'minimal' && step3Hint) {
       return firstSentenceZh(step3Hint)
     }
     return step3Hint
-  }, [condition, fadingStage, step3Hint])
+  }, [condition, step3EffectiveStage, step3Hint])
+
+  const step1EscalationBadge = escalationBadgeStage(step1EscalatedStage)
+  const step2EscalationBadge = escalationBadgeStage(step2EscalatedStage)
+  const step3EscalationBadge = escalationBadgeStage(step3EscalatedStage)
+
+  const showStep1EscalationButton =
+    canEscalateHints && escalateStage(step1EffectiveStage) !== null
+  const showStep2EscalationButton =
+    canEscalateHints && escalateStage(step2EffectiveStage) !== null
+  const showStep3EscalationButton =
+    canEscalateHints && escalateStage(step3EffectiveStage) !== null
 
   const updateStep1Slot = (lineIndex: number, slotIndex: number, value: string) => {
     setStep1SlotValues((rows) =>
@@ -441,7 +664,11 @@ export default function StepScaffold({
     const n = Number.parseFloat(numericAnswer.trim())
     if (!Number.isFinite(n)) return
     setSubmitted(true)
-    onSubmit(n)
+    onSubmit(n, {
+      step1Escalations,
+      step2Escalations,
+      step3Escalations,
+    })
   }
 
   return (
@@ -465,11 +692,24 @@ export default function StepScaffold({
             onSlotChange={updateStep1Slot}
           />
 
-          {showAi ? (
-            <AiHintPanel meta={meta} isLoading={isLoadingStep1} displayText={displayStep1Hint} />
+          {showHintSection ? (
+            <AiHintPanel
+              meta={meta}
+              isLoading={isLoadingStep1}
+              displayText={displayStep1Hint}
+              badge={step1EscalationBadge}
+              escalationButton={
+                showStep1EscalationButton ? (
+                  <MoreHintButton
+                    onClick={() => void escalateStep1Hint()}
+                    disabled={isLoadingStep1}
+                  />
+                ) : null
+              }
+            />
           ) : null}
 
-          {showAi ? (
+          {showHintSection ? (
             <div className="mt-3">
               <button
                 type="button"
@@ -492,11 +732,24 @@ export default function StepScaffold({
             onSlotChange={updateStep2Slot}
           />
 
-          {showStep2Ai ? (
-            <AiHintPanel meta={meta} isLoading={isLoadingStep2} displayText={displayStep2Hint} />
+          {showHintSection ? (
+            <AiHintPanel
+              meta={meta}
+              isLoading={isLoadingStep2}
+              displayText={displayStep2Hint}
+              badge={step2EscalationBadge}
+              escalationButton={
+                showStep2EscalationButton ? (
+                  <MoreHintButton
+                    onClick={() => void escalateStep2Hint()}
+                    disabled={isLoadingStep2}
+                  />
+                ) : null
+              }
+            />
           ) : null}
 
-          {showStep2Ai ? (
+          {showHintSection ? (
             <div className="mt-3">
               <button
                 type="button"
@@ -517,8 +770,21 @@ export default function StepScaffold({
             请在草稿纸上完成计算
           </div>
 
-          {showAi ? (
-            <AiHintPanel meta={meta} isLoading={isLoadingStep3} displayText={displayStep3Hint} />
+          {showHintSection ? (
+            <AiHintPanel
+              meta={meta}
+              isLoading={isLoadingStep3}
+              displayText={displayStep3Hint}
+              badge={step3EscalationBadge}
+              escalationButton={
+                showStep3EscalationButton ? (
+                  <MoreHintButton
+                    onClick={() => void escalateStep3Hint()}
+                    disabled={isLoadingStep3}
+                  />
+                ) : null
+              }
+            />
           ) : null}
         </div>
 

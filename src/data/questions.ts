@@ -29,14 +29,14 @@ export const questions: QuestionData[] = [
     content: '买5支铅笔要10元钱，买同样的铅笔16支，需要多少钱？',
     step1Hints: ['铅笔数量：___ 支', '总价格：___ 元'],
     step2Hints: [
-      '每支铅笔价格 = （___） ÷ （___）',
-      '所求总价 = （___） × （___）',
+      '每支铅笔价格 = （___） ÷ （___） = （___）',
+      '所求总价 = （___） × （___） = （___）',
     ],
     answerUnit: '元',
     correctAnswer: 32,
     answerLabel: '买16支铅笔需要___元',
     expectedStep1Values: ['5', '10'],
-    expectedStep2Values: ['10', '5', '2', '16'],
+    expectedStep2Values: ['10', '5', '2', '2', '16', '32'],
   },
 
   {
@@ -146,7 +146,6 @@ export const questions: QuestionData[] = [
       '甲的速度：___ 米/分钟',
       '乙的速度：___ 米/分钟',
       '甲先行时间：___ 分钟',
-      '甲先行距离：___×___=___ 米',
     ],
     step2Hints: [
       '相遇时间 = ___ ÷ ___',
@@ -154,13 +153,7 @@ export const questions: QuestionData[] = [
     answerUnit: '分钟',
     correctAnswer: 2,
     answerLabel: '乙出发后再过___分钟两人相遇',
-    expectedStep1Values: [
-      '170',
-      '35',
-      '15',
-      '2',
-      '70',
-    ],
+    expectedStep1Values: ['170', '35', '15', '2'],
     expectedStep2Values: [
       '总路程',
       '速度和',
@@ -181,7 +174,6 @@ export const questions: QuestionData[] = [
       '甲的速度：___ 米/分钟',
       '乙的速度：___ 米/分钟',
       '甲先行时间：___ 分钟',
-      '甲先行距离：___×___=___ 米',
     ],
     step2Hints: [
       '相遇时间 = ___ ÷ ___',
@@ -189,13 +181,7 @@ export const questions: QuestionData[] = [
     answerUnit: '分钟',
     correctAnswer: 2,
     answerLabel: '乙出发后再过___分钟两人相遇',
-    expectedStep1Values: [
-      '240',
-      '40',
-      '20',
-      '3',
-      '120',
-    ],
+    expectedStep1Values: ['240', '40', '20', '3'],
     expectedStep2Values: [
       '总路程',
       '速度和',
@@ -216,7 +202,6 @@ export const questions: QuestionData[] = [
       '甲的速度：___ 千米/小时',
       '乙的速度：___ 千米/小时',
       '甲先行时间：___ 小时',
-      '甲先行距离：___×___=___ 千米',
     ],
     step2Hints: [
       '相遇时间 = ___ ÷ ___',
@@ -224,13 +209,7 @@ export const questions: QuestionData[] = [
     answerUnit: '小时',
     correctAnswer: 2,
     answerLabel: '乙出发后再过___小时两人相遇',
-    expectedStep1Values: [
-      '52',
-      '12',
-      '8',
-      '1',
-      '12',
-    ],
+    expectedStep1Values: ['52', '12', '8', '1'],
     expectedStep2Values: [
       '总路程',
       '速度和',
@@ -342,7 +321,7 @@ export const questions: QuestionData[] = [
     step1Hints: [
       '甲的速度：___ 千米/小时',
       '乙的速度：___ 千米/小时',
-      '甲共走时间：___+___=___ 小时',
+      '甲先行时间：___ 小时',
       '乙共走时间：___ 小时',
     ],
     step2Hints: [
@@ -351,12 +330,7 @@ export const questions: QuestionData[] = [
     answerUnit: '千米',
     correctAnswer: 48,
     answerLabel: 'A、B两地相距___千米',
-    expectedStep1Values: [
-      '8',
-      '12',
-      '3',
-      '2',
-    ],
+    expectedStep1Values: ['8', '12', '1', '2'],
     expectedStep2Values: [
       '速度和',
       '相遇时间',
@@ -375,7 +349,7 @@ export const questions: QuestionData[] = [
     step1Hints: [
       '甲的速度：___ 千米/小时',
       '乙的速度：___ 千米/小时',
-      '甲共走时间：___+___=___ 小时',
+      '甲先行时间：___ 小时',
       '乙共走时间：___ 小时',
     ],
     step2Hints: [
@@ -384,12 +358,7 @@ export const questions: QuestionData[] = [
     answerUnit: '千米',
     correctAnswer: 108,
     answerLabel: 'A、B两地相距___千米',
-    expectedStep1Values: [
-      '12',
-      '16',
-      '5',
-      '3',
-    ],
+    expectedStep1Values: ['12', '16', '2', '3'],
     expectedStep2Values: [
       '速度和',
       '相遇时间',

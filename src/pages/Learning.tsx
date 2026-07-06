@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 import FadingIndicator from '../components/FadingIndicator'
 import LevelUpAnimation from '../components/LevelUpAnimation'
-import StepScaffold from '../components/StepScaffold'
+import StepScaffold, { type StepSubmitMeta } from '../components/StepScaffold'
 import { experimentQuestions } from '../data/questions'
 import { useLearningStore } from '../store/learningStore'
 import type { FadingStage, SkillType, StudyCondition } from '../types'
@@ -63,8 +63,18 @@ export default function Learning() {
     newStage: FadingStage
   } | null>(null)
   const [pendingNav, setPendingNav] = useState<{
-    correct: boolean
-    correctAnswer: string
+    reflectionState: {
+      questionContent: string
+      isCorrect: boolean
+      correctAnswer: string
+      subject: string
+      skillType: SkillType
+      questionId: string
+      userAnswer: number
+      step1Escalations: number
+      step2Escalations: number
+      step3Escalations: number
+    }
   } | null>(null)
 
   if (!currentSkillType || !currentQuestion) {
@@ -76,26 +86,29 @@ export default function Learning() {
   const dismissLevelUp = () => {
     setShowLevelUp(false)
     if (pendingNav) {
-      navigate('/reflection', {
-        state: {
-          questionContent: currentQuestion.content,
-          isCorrect: pendingNav.correct,
-          correctAnswer: pendingNav.correctAnswer,
-          subject: currentQuestion.subject,
-          skillType: currentQuestion.skillType,
-        },
-      })
+      navigate('/reflection', { state: pendingNav.reflectionState })
       setPendingNav(null)
     }
   }
 
-  const handleSubmit = (answer: number) => {
+  const handleSubmit = (answer: number, meta: StepSubmitMeta) => {
     if (submitted) return
     const correct = answer === currentQuestion.correctAnswer
     setSubmitted(true)
     setIsCorrect(correct)
 
     const bktResult = updateBKTAfterAnswer(currentQuestion.skillType, correct)
+
+    const reflectionState = {
+      questionContent: currentQuestion.content,
+      isCorrect: correct,
+      correctAnswer: correctAnswerText,
+      subject: currentQuestion.subject,
+      skillType: currentQuestion.skillType,
+      questionId: currentQuestion.id,
+      userAnswer: answer,
+      ...meta,
+    }
 
     if (condition === 'fading' && bktResult.levelIncreased) {
       setLevelUpData({
@@ -104,20 +117,12 @@ export default function Learning() {
         previousStage: bktResult.previousStage,
         newStage: bktResult.newStage,
       })
-      setPendingNav({ correct, correctAnswer: correctAnswerText })
+      setPendingNav({ reflectionState })
       setShowLevelUp(true)
       return
     }
 
-    navigate('/reflection', {
-      state: {
-        questionContent: currentQuestion.content,
-        isCorrect: correct,
-        correctAnswer: correctAnswerText,
-        subject: currentQuestion.subject,
-        skillType: currentQuestion.skillType,
-      },
-    })
+    navigate('/reflection', { state: reflectionState })
   }
 
   return (

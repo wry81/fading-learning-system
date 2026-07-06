@@ -51,42 +51,67 @@ export function getStep2FormulaRows(question: QuestionData): Step2FormulaRow[] {
 }
 
 export function initEmptyStep2Slots(question: QuestionData): string[][] {
-  return getStep2FormulaRows(question).map(() => ['', ''])
+  return getStep2FormulaRows(question).map(() => ['', '', ''])
 }
 
-/** Flat expected values for each blank, left-to-right, top-to-bottom. */
+function n(v: string | undefined): number {
+  const x = Number.parseFloat(String(v ?? '').trim())
+  return Number.isFinite(x) ? x : NaN
+}
+
+function row(a: number, b: number, result: number): string[] {
+  return [String(a), String(b), String(result)]
+}
+
+/** Flat expected values: operand₁, operand₂, result per formula row. */
 export function getStep2ExpectedValues(question: QuestionData): string[] {
+  const s1 = question.expectedStep1Values
+  const ans = question.correctAnswer
+
   if (question.isTutorial) {
-    return question.expectedStep2Values
+    const qty = n(s1[0])
+    const total = n(s1[1])
+    const unit = total / qty
+    return [...row(total, qty, unit), ...row(unit, 16, ans)]
   }
 
   const { skillType, hasTimeGap } = question
 
   if (skillType === '求时间') {
+    const dist = n(s1[0])
+    const speedA = n(s1[1])
+    const speedB = n(s1[2])
+
     if (hasTimeGap) {
+      const headTime = n(s1[3])
+      const headDist = speedA * headTime
+      const remaining = dist - headDist
+      const speedSum = speedA + speedB
       return [
-        '甲的速度',
-        '先行时间',
-        '总路程',
-        '甲先行距离',
-        '甲的速度',
-        '乙的速度',
-        '剩余距离',
-        '速度和',
+        ...row(speedA, headTime, headDist),
+        ...row(dist, headDist, remaining),
+        ...row(speedA, speedB, speedSum),
+        ...row(remaining, speedSum, ans),
       ]
     }
-    return ['甲的速度', '乙的速度', '总路程', '速度和']
+
+    const speedSum = speedA + speedB
+    return [...row(speedA, speedB, speedSum), ...row(dist, speedSum, ans)]
   }
 
+  const speedA = n(s1[0])
+  const speedB = n(s1[1])
+
   if (hasTimeGap) {
-    return [
-      '甲的速度',
-      '甲走的时间',
-      '乙的速度',
-      '乙走的时间',
-      '甲走的路程',
-      '乙走的路程',
-    ]
+    const headTime = n(s1[2])
+    const timeB = n(s1[3])
+    const timeA = headTime + timeB
+    const distA = speedA * timeA
+    const distB = speedB * timeB
+    return [...row(speedA, timeA, distA), ...row(speedB, timeB, distB), ...row(distA, distB, ans)]
   }
-  return ['甲的速度', '乙的速度', '速度和', '相遇时间']
+
+  const meetTime = n(s1[2])
+  const speedSum = speedA + speedB
+  return [...row(speedA, speedB, speedSum), ...row(speedSum, meetTime, ans)]
 }
