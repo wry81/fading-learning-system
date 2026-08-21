@@ -42,8 +42,7 @@ const FILLED_COUNT: Record<FadingStage, number> = {
 }
 
 const SKILL_LABELS: Record<string, string> = {
-  求时间: '求相遇时间',
-  求路程: '求总路程',
+  倍数份数关系: '倍数份数关系',
 }
 
 export default function FadingIndicator({
@@ -57,10 +56,13 @@ export default function FadingIndicator({
   const skillStates = ensureSkillStates(rawSkillStates)
   const activeSkill = useLearningStore((s) => s.activeSkill)
   const globalFadingStage = useLearningStore((s) => s.fadingStage)
+  const condition = useLearningStore((s) => s.condition)
 
   const resolvedKey = skillKey ?? activeSkill ?? skill
   const skillState = resolvedKey ? skillStates[resolvedKey] : null
-  const fadingStage = skillState?.fadingStage ?? globalFadingStage
+  const fadingStage = condition === 'no_ai'
+    ? 'none'
+    : (skillState?.fadingStage ?? globalFadingStage)
 
   const skillLabel = resolvedKey
     ? `${SKILL_LABELS[resolvedKey] ?? resolvedKey}进度`
@@ -98,13 +100,17 @@ export default function FadingIndicator({
               )
             })}
           </div>
-          <span className="text-l3 font-semibold text-[#3D2E7C]">{stage.label}</span>
+          <span className="text-l3 font-semibold text-[#3D2E7C]">
+            {condition === 'no_ai' ? '无 AI 辅助' : stage.label}
+          </span>
         </div>
 
         <div className="hidden h-5 w-px bg-[#C8C9E8] sm:block" aria-hidden="true" />
 
         <p className="min-w-0 flex-1 text-l4 leading-snug text-[#3D2E7C]">
-          {stage.description}
+          {condition === 'no_ai'
+            ? '本组不提供 AI 提示，请独立完成题目。'
+            : stage.description}
         </p>
       </div>
     </div>

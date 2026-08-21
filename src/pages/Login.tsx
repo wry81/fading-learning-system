@@ -50,6 +50,7 @@ export default function Login() {
   const setCondition = useLearningStore((s) => s.setCondition)
   const startLearningSession = useLearningStore((s) => s.startSession)
   const initBKT = useLearningStore((s) => s.initBKT)
+  const restoreFromSession = useLearningStore((s) => s.restoreFromSession)
 
   const [participantId, setParticipantId] = useState('')
   const trimmedId = participantId.trim()
@@ -72,7 +73,10 @@ export default function Login() {
 
   const startReturning = (id: string) => {
     const p = getParticipant(id)
-    if (p) setCondition(p.condition)
+    if (p) {
+      setCondition(p.condition)
+      restoreFromSession(p.sessions.at(-1) ?? null)
+    }
     setCurrentParticipantId(id)
     startLearningSession()
     navigate('/home')

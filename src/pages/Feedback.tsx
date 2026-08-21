@@ -100,8 +100,8 @@ export default function Feedback() {
             <div>
               <div className="mb-1 text-l4 font-medium text-[#6353AC]">解析</div>
               <div>
-                行程类问题请结合题意中的路程、速度与时间关系核对；可对照 AI
-                提示中的分步思路，在草稿纸上重算一遍以巩固。
+                先把较小的数量看作 1 份，根据倍数关系确定另一个数量的份数；
+                再用已知的总数或差求出 1 份，并检查两个答案。
               </div>
             </div>
           </div>

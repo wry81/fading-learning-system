@@ -1,6 +1,7 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
-import type { Participant, StudyCondition } from '../types'
+import type { Participant, Session, StudyCondition } from '../types'
 
 type ParticipantStore = {
   participants: Participant[]
@@ -8,6 +9,7 @@ type ParticipantStore = {
   getParticipant: (id: string) => Participant | null
   createParticipant: (id: string) => Participant
   saveParticipant: (participant: Participant) => void
+  saveSession: (participantId: string, session: Session) => void
   exportAllData: () => void
 }
 
@@ -21,7 +23,7 @@ export function detectCondition(id: string): StudyCondition {
   return 'fading'
 }
 
-export const useParticipantStore = create<ParticipantStore>((set, get) => ({
+export const useParticipantStore = create<ParticipantStore>()(persist((set, get) => ({
   participants: [],
 
   getAllParticipants: () => get().participants,
@@ -55,8 +57,27 @@ export const useParticipantStore = create<ParticipantStore>((set, get) => ({
     }))
   },
 
+  saveSession: (participantId: string, session: Session) => {
+    set((state) => ({
+      participants: state.participants.map((participant) => {
+        if (participant.id !== participantId) return participant
+        const existingIndex = participant.sessions.findIndex(
+          (item) => item.sessionId === session.sessionId,
+        )
+        const sessions =
+          existingIndex === -1
+            ? [...participant.sessions, session]
+            : participant.sessions.map((item, index) =>
+                index === existingIndex ? session : item,
+              )
+        return { ...participant, sessions }
+      }),
+    }))
+  },
+
   exportAllData: () => {
     const payload = {
+      schemaVersion: 2,
       exportedAt: nowIso(),
       participants: get().participants,
     }
@@ -73,5 +94,8 @@ export const useParticipantStore = create<ParticipantStore>((set, get) => ({
     a.remove()
     URL.revokeObjectURL(url)
   },
+}), {
+  name: 'fading-learning-participants-v1',
+  version: 1,
+  partialize: (state) => ({ participants: state.participants }),
 }))
-

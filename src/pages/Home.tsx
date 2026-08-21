@@ -4,16 +4,14 @@ import { useNavigate } from 'react-router-dom'
 import AbilityHistory from '../components/AbilityHistory'
 import FadingIndicator from '../components/FadingIndicator'
 import { experimentQuestions } from '../data/questions'
-import distanceIcon from '../assets/distance.svg'
-import timeIcon from '../assets/time.svg'
+import planIcon from '../assets/plan.svg'
 import skillIcon from '../assets/home.svg'
 import { useLearningStore, ensureSkillStates } from '../store/learningStore'
 import { useParticipantStore } from '../store/participantStore'
 import type { SkillType } from '../types'
 
 const QUESTIONS_PER_SKILL: Record<SkillType, number> = {
-  求时间: experimentQuestions('求时间').length,
-  求路程: experimentQuestions('求路程').length,
+  倍数份数关系: experimentQuestions('倍数份数关系').length,
 }
 
 type SkillModule = {
@@ -26,18 +24,11 @@ type SkillModule = {
 
 const SKILL_MODULES: SkillModule[] = [
   {
-    skillType: '求时间',
-    title: '求相遇时间',
-    iconSrc: timeIcon,
+    skillType: '倍数份数关系',
+    title: '倍数份数关系',
+    iconSrc: planIcon,
     borderColor: '#9F9DF3',
     iconBg: 'bg-[#9F9DF3]/30',
-  },
-  {
-    skillType: '求路程',
-    title: '求总路程',
-    iconSrc: distanceIcon,
-    borderColor: '#C9EBCA',
-    iconBg: 'bg-[#C9EBCA]/50',
   },
 ]
 

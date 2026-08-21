@@ -1,400 +1,88 @@
-import type { HasTimeGapMeta, SkillType, TutorialQuestionMeta } from '../types'
+import type { ProblemSubtype, SkillType, TutorialQuestionMeta } from '../types'
 
-export interface QuestionData extends HasTimeGapMeta, TutorialQuestionMeta {
+export interface QuestionData extends TutorialQuestionMeta {
   id: string
   type: 'fill_in_blank'
   subject: string
   skillType: SkillType
+  subtype: ProblemSubtype
   difficulty: 0 | 1 | 2 | 3 | 4 | 5
   content: string
-  step1Hints: string[]
-  step2Hints: string[]
-  /** Flat list in reading order: each line's blanks left-to-right, then next line. */
-  expectedStep1Values: string[]
-  expectedStep2Values: string[]
-  answerUnit: string
-  correctAnswer: number
-  answerLabel: string
+  baseLabel: string
+  largerLabel: string
+  factor: number
+  knownAmount: number
+  knownQuantityLabel: string
+  correctAnswers: number[]
+  answerLabels: string[]
+  answerUnits: string[]
 }
 
 export const questions: QuestionData[] = [
   {
-    id: 'tutorial1',
-    type: 'fill_in_blank',
-    subject: '练习题',
-    skillType: '求时间',
-    difficulty: 0,
-    isTutorial: true,
-    hasTimeGap: false,
-    content: '买5支铅笔要10元钱，买同样的铅笔16支，需要多少钱？',
-    step1Hints: ['铅笔数量：___ 支', '总价格：___ 元'],
-    step2Hints: [
-      '每支铅笔价格 = （___） ÷ （___） = （___）',
-      '所求总价 = （___） × （___） = （___）',
-    ],
-    answerUnit: '元',
-    correctAnswer: 32,
-    answerLabel: '买16支铅笔需要___元',
-    expectedStep1Values: ['5', '10'],
-    expectedStep2Values: ['10', '5', '2', '2', '16', '32'],
+    id: 'tutorial1', type: 'fill_in_blank', subject: '练习题', skillType: '倍数份数关系',
+    subtype: 'sum', difficulty: 0, isTutorial: true,
+    content: '小明和小红一共有24颗糖。小红的糖是小明的2倍。两人各有多少颗糖？',
+    baseLabel: '小明', largerLabel: '小红', factor: 2, knownAmount: 24,
+    knownQuantityLabel: '小明和小红糖的总数',
+    correctAnswers: [8, 16], answerLabels: ['小明', '小红'], answerUnits: ['颗', '颗'],
   },
-
   {
-    id: 't001',
-    type: 'fill_in_blank',
-    subject: '相遇问题',
-    skillType: '求时间',
-    hasTimeGap: false,
-    difficulty: 1,
-    content:
-      '甲和乙从相距300米的两端同时出发相向而行，甲每分钟走60米，乙每分钟走40米，几分钟后两人相遇？',
-    step1Hints: [
-      '两地距离：___ 米',
-      '甲的速度：___ 米/分钟',
-      '乙的速度：___ 米/分钟',
-    ],
-    step2Hints: [
-      '相遇时间 = ___ ÷ ___',
-    ],
-    answerUnit: '分钟',
-    correctAnswer: 3,
-    answerLabel: '___分钟后两人相遇',
-    expectedStep1Values: [
-      '300',
-      '60',
-      '40',
-    ],
-    expectedStep2Values: [
-      '总路程',
-      '速度和',
-    ],
+    id: 'm001', type: 'fill_in_blank', subject: '倍数关系·和', skillType: '倍数份数关系', subtype: 'sum', difficulty: 1,
+    content: '小宇和小杰一共有48张卡片。小杰的卡片数量是小宇的3倍。两人各有多少张卡片？',
+    baseLabel: '小宇', largerLabel: '小杰', factor: 3, knownAmount: 48,
+    knownQuantityLabel: '小宇和小杰卡片的总数',
+    correctAnswers: [12, 36], answerLabels: ['小宇', '小杰'], answerUnits: ['张', '张'],
   },
-
   {
-    id: 't002',
-    type: 'fill_in_blank',
-    subject: '相遇问题',
-    skillType: '求时间',
-    hasTimeGap: false,
-    difficulty: 2,
-    content:
-      '甲和乙从相距560米的两端同时出发相向而行，甲每分钟走45米，乙每分钟走25米，几分钟后两人相遇？',
-    step1Hints: [
-      '两地距离：___ 米',
-      '甲的速度：___ 米/分钟',
-      '乙的速度：___ 米/分钟',
-    ],
-    step2Hints: [
-      '相遇时间 = ___ ÷ ___',
-    ],
-    answerUnit: '分钟',
-    correctAnswer: 8,
-    answerLabel: '___分钟后两人相遇',
-    expectedStep1Values: [
-      '560',
-      '45',
-      '25',
-    ],
-    expectedStep2Values: [
-      '总路程',
-      '速度和',
-    ],
+    id: 'm002', type: 'fill_in_blank', subject: '倍数关系·差', skillType: '倍数份数关系', subtype: 'difference', difficulty: 1,
+    content: '哥哥的邮票数量是弟弟的3倍，哥哥比弟弟多28张邮票。两人各有多少张邮票？',
+    baseLabel: '弟弟', largerLabel: '哥哥', factor: 3, knownAmount: 28,
+    knownQuantityLabel: '哥哥和弟弟邮票的数量差',
+    correctAnswers: [14, 42], answerLabels: ['弟弟', '哥哥'], answerUnits: ['张', '张'],
   },
-
   {
-    id: 't003',
-    type: 'fill_in_blank',
-    subject: '相遇问题',
-    skillType: '求时间',
-    hasTimeGap: false,
-    difficulty: 3,
-    content:
-      '甲和乙从相距720米的两端同时出发相向而行，甲每分钟走48米，乙每分钟走42米，几分钟后两人相遇？',
-    step1Hints: [
-      '两地距离：___ 米',
-      '甲的速度：___ 米/分钟',
-      '乙的速度：___ 米/分钟',
-    ],
-    step2Hints: [
-      '相遇时间 = ___ ÷ ___',
-    ],
-    answerUnit: '分钟',
-    correctAnswer: 8,
-    answerLabel: '___分钟后两人相遇',
-    expectedStep1Values: [
-      '720',
-      '48',
-      '42',
-    ],
-    expectedStep2Values: [
-      '总路程',
-      '速度和',
-    ],
+    id: 'm003', type: 'fill_in_blank', subject: '倍数关系·和', skillType: '倍数份数关系', subtype: 'sum', difficulty: 2,
+    content: '学校科技社团中，五年级参加的人数是四年级的2倍，两个年级一共有45人。两个年级分别有多少人参加？',
+    baseLabel: '四年级', largerLabel: '五年级', factor: 2, knownAmount: 45,
+    knownQuantityLabel: '四年级和五年级参加科技社团的总人数',
+    correctAnswers: [15, 30], answerLabels: ['四年级', '五年级'], answerUnits: ['人', '人'],
   },
-
   {
-    id: 't004',
-    type: 'fill_in_blank',
-    subject: '相遇问题',
-    skillType: '求时间',
-    hasTimeGap: true,
-    difficulty: 3,
-    content:
-      '甲从A地出发，走了2分钟后乙才从B地出发，两人相向而行。甲每分钟走35米，乙每分钟走15米，两地相距170米，乙出发后再过几分钟两人相遇？',
-    step1Hints: [
-      '两地距离：___ 米',
-      '甲的速度：___ 米/分钟',
-      '乙的速度：___ 米/分钟',
-      '甲先行时间：___ 分钟',
-    ],
-    step2Hints: [
-      '相遇时间 = ___ ÷ ___',
-    ],
-    answerUnit: '分钟',
-    correctAnswer: 2,
-    answerLabel: '乙出发后再过___分钟两人相遇',
-    expectedStep1Values: ['170', '35', '15', '2'],
-    expectedStep2Values: [
-      '总路程',
-      '速度和',
-    ],
+    id: 'm004', type: 'fill_in_blank', subject: '倍数关系·差', skillType: '倍数份数关系', subtype: 'difference', difficulty: 2,
+    content: '红色彩带的长度是蓝色彩带的4倍，红色彩带比蓝色彩带长36厘米。两条彩带分别长多少厘米？',
+    baseLabel: '蓝色彩带', largerLabel: '红色彩带', factor: 4, knownAmount: 36,
+    knownQuantityLabel: '红色彩带和蓝色彩带的长度差',
+    correctAnswers: [12, 48], answerLabels: ['蓝色彩带', '红色彩带'], answerUnits: ['厘米', '厘米'],
   },
-
   {
-    id: 't005',
-    type: 'fill_in_blank',
-    subject: '相遇问题',
-    skillType: '求时间',
-    hasTimeGap: true,
-    difficulty: 4,
-    content:
-      '甲从A地出发，走了3分钟后乙才从B地出发，两人相向而行。甲每分钟走40米，乙每分钟走20米，两地相距240米，乙出发后再过几分钟两人相遇？',
-    step1Hints: [
-      '两地距离：___ 米',
-      '甲的速度：___ 米/分钟',
-      '乙的速度：___ 米/分钟',
-      '甲先行时间：___ 分钟',
-    ],
-    step2Hints: [
-      '相遇时间 = ___ ÷ ___',
-    ],
-    answerUnit: '分钟',
-    correctAnswer: 2,
-    answerLabel: '乙出发后再过___分钟两人相遇',
-    expectedStep1Values: ['240', '40', '20', '3'],
-    expectedStep2Values: [
-      '总路程',
-      '速度和',
-    ],
+    id: 'm005', type: 'fill_in_blank', subject: '倍数关系·和', skillType: '倍数份数关系', subtype: 'sum', difficulty: 3,
+    content: '两个书架上一共有70本书。上层书架的书是下层书架的4倍。两个书架分别有多少本书？',
+    baseLabel: '下层书架', largerLabel: '上层书架', factor: 4, knownAmount: 70,
+    knownQuantityLabel: '上层书架和下层书架图书的总数',
+    correctAnswers: [14, 56], answerLabels: ['下层书架', '上层书架'], answerUnits: ['本', '本'],
   },
-
   {
-    id: 't006',
-    type: 'fill_in_blank',
-    subject: '相遇问题',
-    skillType: '求时间',
-    hasTimeGap: true,
-    difficulty: 5,
-    content:
-      '甲骑自行车从A城出发，乙骑自行车从B城出发相向而行，A、B两城相距52千米。甲每小时行12千米，乙每小时行8千米。甲出发1小时后乙才出发，乙出发后再过几小时两人相遇？',
-    step1Hints: [
-      '两城距离：___ 千米',
-      '甲的速度：___ 千米/小时',
-      '乙的速度：___ 千米/小时',
-      '甲先行时间：___ 小时',
-    ],
-    step2Hints: [
-      '相遇时间 = ___ ÷ ___',
-    ],
-    answerUnit: '小时',
-    correctAnswer: 2,
-    answerLabel: '乙出发后再过___小时两人相遇',
-    expectedStep1Values: ['52', '12', '8', '1'],
-    expectedStep2Values: [
-      '总路程',
-      '速度和',
-    ],
+    id: 'm006', type: 'fill_in_blank', subject: '倍数关系·差', skillType: '倍数份数关系', subtype: 'difference', difficulty: 3,
+    content: '篮子里苹果的数量是梨的5倍，苹果比梨多48个。苹果和梨分别有多少个？',
+    baseLabel: '梨', largerLabel: '苹果', factor: 5, knownAmount: 48,
+    knownQuantityLabel: '苹果和梨的数量差',
+    correctAnswers: [12, 60], answerLabels: ['梨', '苹果'], answerUnits: ['个', '个'],
   },
-
   {
-    id: 'r001',
-    type: 'fill_in_blank',
-    subject: '相遇问题',
-    skillType: '求路程',
-    hasTimeGap: false,
-    difficulty: 1,
-    content:
-      '甲和乙从两地同时出发相向而行，甲每分钟走55米，乙每分钟走45米，经过6分钟后两人相遇，两地相距多少米？',
-    step1Hints: [
-      '甲的速度：___ 米/分钟',
-      '乙的速度：___ 米/分钟',
-      '相遇时间：___ 分钟',
-    ],
-    step2Hints: [
-      '两地距离 = ___ × ___',
-    ],
-    answerUnit: '米',
-    correctAnswer: 600,
-    answerLabel: '两地相距___米',
-    expectedStep1Values: [
-      '55',
-      '45',
-      '6',
-    ],
-    expectedStep2Values: [
-      '速度和',
-      '相遇时间',
-    ],
+    id: 'm007', type: 'fill_in_blank', subject: '倍数关系·和', skillType: '倍数份数关系', subtype: 'sum', difficulty: 4,
+    content: '小林和小雨一共存了84元。小林存的钱是小雨的6倍。两人分别存了多少钱？',
+    baseLabel: '小雨', largerLabel: '小林', factor: 6, knownAmount: 84,
+    knownQuantityLabel: '小林和小雨存钱的总数',
+    correctAnswers: [12, 72], answerLabels: ['小雨', '小林'], answerUnits: ['元', '元'],
   },
-
   {
-    id: 'r002',
-    type: 'fill_in_blank',
-    subject: '相遇问题',
-    skillType: '求路程',
-    hasTimeGap: false,
-    difficulty: 2,
-    content:
-      '甲和乙从两地同时出发相向而行，甲每小时走12千米，乙每小时走8千米，5小时后两人相遇，两地相距多少千米？',
-    step1Hints: [
-      '甲的速度：___ 千米/小时',
-      '乙的速度：___ 千米/小时',
-      '相遇时间：___ 小时',
-    ],
-    step2Hints: [
-      '两地距离 = ___ × ___',
-    ],
-    answerUnit: '千米',
-    correctAnswer: 100,
-    answerLabel: '两地相距___千米',
-    expectedStep1Values: [
-      '12',
-      '8',
-      '5',
-    ],
-    expectedStep2Values: [
-      '速度和',
-      '相遇时间',
-    ],
+    id: 'm008', type: 'fill_in_blank', subject: '倍数关系·差', skillType: '倍数份数关系', subtype: 'difference', difficulty: 4,
+    content: '科技馆上午接待的学生人数是下午的5倍，上午比下午多接待72名学生。上午和下午分别接待多少名学生？',
+    baseLabel: '下午', largerLabel: '上午', factor: 5, knownAmount: 72,
+    knownQuantityLabel: '上午和下午接待学生的人数差',
+    correctAnswers: [18, 90], answerLabels: ['下午', '上午'], answerUnits: ['名', '名'],
   },
-
-  {
-    id: 'r003',
-    type: 'fill_in_blank',
-    subject: '相遇问题',
-    skillType: '求路程',
-    hasTimeGap: false,
-    difficulty: 3,
-    content:
-      '甲和乙从两地同时出发相向而行，甲每小时走18千米，乙每小时走12千米，4小时后两人相遇，两地相距多少千米？',
-    step1Hints: [
-      '甲的速度：___ 千米/小时',
-      '乙的速度：___ 千米/小时',
-      '相遇时间：___ 小时',
-    ],
-    step2Hints: [
-      '两地距离 = ___ × ___',
-    ],
-    answerUnit: '千米',
-    correctAnswer: 120,
-    answerLabel: '两地相距___千米',
-    expectedStep1Values: [
-      '18',
-      '12',
-      '4',
-    ],
-    expectedStep2Values: [
-      '速度和',
-      '相遇时间',
-    ],
-  },
-
-  {
-    id: 'r004',
-    type: 'fill_in_blank',
-    subject: '相遇问题',
-    skillType: '求路程',
-    hasTimeGap: true,
-    difficulty: 3,
-    content:
-      '甲从A地出发，1小时后乙从B地出发，两人相向而行。甲每小时走8千米，乙每小时走12千米，乙出发后2小时两人相遇，A、B两地相距多少千米？',
-    step1Hints: [
-      '甲的速度：___ 千米/小时',
-      '乙的速度：___ 千米/小时',
-      '甲先行时间：___ 小时',
-      '乙共走时间：___ 小时',
-    ],
-    step2Hints: [
-      '两地距离 = ___ × ___',
-    ],
-    answerUnit: '千米',
-    correctAnswer: 48,
-    answerLabel: 'A、B两地相距___千米',
-    expectedStep1Values: ['8', '12', '1', '2'],
-    expectedStep2Values: [
-      '速度和',
-      '相遇时间',
-    ],
-  },
-
-  {
-    id: 'r005',
-    type: 'fill_in_blank',
-    subject: '相遇问题',
-    skillType: '求路程',
-    hasTimeGap: true,
-    difficulty: 4,
-    content:
-      '甲从A地出发，2小时后乙从B地出发，两人相向而行。甲每小时走12千米，乙每小时走16千米，乙出发后3小时两人相遇，A、B两地相距多少千米？',
-    step1Hints: [
-      '甲的速度：___ 千米/小时',
-      '乙的速度：___ 千米/小时',
-      '甲先行时间：___ 小时',
-      '乙共走时间：___ 小时',
-    ],
-    step2Hints: [
-      '两地距离 = ___ × ___',
-    ],
-    answerUnit: '千米',
-    correctAnswer: 108,
-    answerLabel: 'A、B两地相距___千米',
-    expectedStep1Values: ['12', '16', '2', '3'],
-    expectedStep2Values: [
-      '速度和',
-      '相遇时间',
-    ],
-  },
-
-  {
-    id: 'r006',
-    type: 'fill_in_blank',
-    subject: '相遇问题',
-    skillType: '求路程',
-    hasTimeGap: false,
-    difficulty: 5,
-    content:
-      '甲、乙两人同时从A、B两地出发相向而行，甲的速度是乙速度的3倍，经过4小时后两人相遇，乙每小时走5千米，A、B两地相距多少千米？',
-    step1Hints: [
-      '乙的速度：___ 千米/小时',
-      '甲的速度：___×___=___ 千米/小时',
-      '相遇时间：___ 小时',
-    ],
-    step2Hints: [
-      '两地距离 = ___ × ___',
-    ],
-    answerUnit: '千米',
-    correctAnswer: 80,
-    answerLabel: 'A、B两地相距___千米',
-    expectedStep1Values: [
-      '5',
-      '15',
-      '4',
-    ],
-    expectedStep2Values: [
-      '速度和',
-      '相遇时间',
-    ],
-  }
 ]
 
 export function experimentQuestions(skillType: SkillType): QuestionData[] {
@@ -403,8 +91,6 @@ export function experimentQuestions(skillType: SkillType): QuestionData[] {
 
 export function getTutorialQuestion(): QuestionData {
   const tutorial = questions.find((q) => q.isTutorial)
-  if (!tutorial) {
-    throw new Error('Tutorial question not found')
-  }
+  if (!tutorial) throw new Error('Tutorial question not found')
   return tutorial
 }

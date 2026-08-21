@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { QuestionData } from '../data/questions'
 import { useLearningStore } from '../store/learningStore'
-import { alignStudentToExpected, checkHintInputs } from '../utils/hintCheck'
+import { checkHintInputs } from '../utils/hintCheck'
 import {
   EMPTY_CHECK_HINT,
   generateStep1Hint,
@@ -11,374 +11,105 @@ import {
   generateStep2InitialHint,
   generateStep3Hint,
 } from '../utils/aiHints'
-import {
-  getStep2ExpectedValues,
-  getStep2FormulaRows,
-  initEmptyStep2Slots,
-  STEP2_REMINDER,
-} from '../utils/step2Formula'
-import type { FadingStage, StudyCondition } from '../types'
+import { getExpectedPartCount, getPartRelationshipLabel } from '../utils/step2Formula'
+import type {
+  FadingStage,
+  HintExposureRecord,
+  ProblemTimingRecord,
+  StepProcessRecord,
+  StudyCondition,
+  SupportEscalationRecord,
+} from '../types'
 
-export type FixedTutorialHints = {
-  step1: string
-  step2: string
-  step3?: string
-}
+export type FixedTutorialHints = { step1: string; step2: string; step3?: string }
 
 export type StepSubmitMeta = {
   step1Escalations: number
   step2Escalations: number
   step3Escalations: number
+  steps: {
+    step1: StepProcessRecord
+    step2: StepProcessRecord
+    step3: StepProcessRecord
+  }
+  timing: ProblemTimingRecord
 }
 
 export type StepScaffoldProps = {
   question: QuestionData
   condition: StudyCondition
-  onSubmit: (answer: number, meta: StepSubmitMeta) => void
+  onSubmit: (answers: number[], meta: StepSubmitMeta) => void
   forcedFadingStage?: FadingStage
   fixedHints?: FixedTutorialHints
 }
 
-type HintCardMeta = {
-  accentClass: string
-  title: string
-  containerClass: string
-}
+const inputClass =
+  'h-10 min-w-[90px] rounded-xl border border-[#9F9DF3] bg-white px-3 text-center text-l3 text-[#2D2D2D] outline-none focus:border-[#6353AC] focus:ring-2 focus:ring-[#9F9DF3]/30'
 
-function escalateStage(current: FadingStage): FadingStage | null {
-  if (current === 'none') return 'minimal'
-  if (current === 'minimal') return 'partial'
-  if (current === 'partial') return 'full_support'
-  if (current === 'full_support') return null
-  return null
-}
-
-function effectiveStage(
-  base: FadingStage,
-  escalated: FadingStage | null,
-): FadingStage {
-  return escalated ?? base
-}
-
-function escalationBadgeStage(
-  escalated: FadingStage | null,
-): 'partial' | 'full_support' | null {
-  if (escalated === 'partial') return 'partial'
-  if (escalated === 'full_support') return 'full_support'
+function escalateStage(stage: FadingStage): FadingStage | null {
+  if (stage === 'none') return 'minimal'
+  if (stage === 'minimal') return 'partial'
+  if (stage === 'partial') return 'full_support'
   return null
 }
 
 function firstSentenceZh(text: string): string {
-  const t = text.trim()
-  if (!t) return ''
-  const m = t.match(/^[^。！？\n]+[。！？]?/)
-  if (m) return m[0].trim()
-  return t.length > 40 ? `${t.slice(0, 40)}…` : t
+  const match = text.trim().match(/^[^。！？\n]+[。！？]?/)
+  return match?.[0]?.trim() ?? text.trim()
 }
 
-function hintMetaFor(_condition: StudyCondition, _stage: FadingStage): HintCardMeta {
-  return {
-    title: 'Step AI 提示',
-    accentClass: 'border-l-[3px] border-l-[#9F9DF3]',
-    containerClass: 'bg-[#D5D6F2]',
-  }
-}
+const elapsedSeconds = (start: number, end: number) =>
+  Math.max(0, Math.round((end - start) / 1000))
 
-function ThinkingDots() {
+function HintPanel({ loading, text }: { loading: boolean; text: string }) {
   return (
-    <span className="ml-1 inline-flex gap-0.5" aria-hidden>
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          className="inline-block h-1 w-1 rounded-full bg-[#9F9DF3] motion-safe:animate-bounce"
-          style={{ animationDelay: `${i * 0.15}s` }}
-        />
-      ))}
-    </span>
-  )
-}
-
-const step1InputClass =
-  'h-8 min-w-[60px] w-[60px] shrink-0 border-0 border-b-2 border-[#9F9DF3] bg-transparent px-0.5 text-center text-l3 text-[#2D2D2D] outline-none focus:border-[#6353AC] focus:ring-0'
-
-const step2InputClass =
-  'h-8 w-[70px] min-w-[70px] shrink-0 border-0 border-b-2 border-[#9F9DF3] bg-transparent px-0.5 text-center text-l3 text-[#2D2D2D] outline-none focus:border-[#6353AC] focus:ring-0'
-
-type FillableHintRowsProps = {
-  lines: string[]
-  values: string[][]
-  onSlotChange: (lineIndex: number, slotIndex: number, value: string) => void
-}
-
-function FillableHintRows({ lines, values, onSlotChange }: FillableHintRowsProps) {
-  return (
-    <div className="mt-3 space-y-3">
-      {lines.map((line, lineIndex) => {
-        const parts = line.split('___')
-        const rowValues = values[lineIndex] ?? []
-        return (
-          <div
-            key={lineIndex}
-            className="flex min-h-[1.75rem] flex-wrap items-center gap-x-1 gap-y-1 text-l3 leading-relaxed text-[#2D2D2D]"
-          >
-            {parts.map((part, i) => (
-              <span key={i} className="inline-flex items-center gap-1">
-                <span className="whitespace-pre-wrap">{part}</span>
-                {i < parts.length - 1 ? (
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    className={step1InputClass}
-                    placeholder=""
-                    value={rowValues[i] ?? ''}
-                    onChange={(e) => onSlotChange(lineIndex, i, e.target.value)}
-                    aria-label={`第 ${lineIndex + 1} 行填空 ${i + 1}`}
-                  />
-                ) : null}
-              </span>
-            ))}
-          </div>
-        )
-      })}
+    <div className="mt-4 min-h-[3.5rem] rounded-2xl border border-[#C8C9E8] border-l-[3px] border-l-[#9F9DF3] bg-[#D5D6F2] p-4">
+      <div className="text-l2 text-[#2D2D2D]">提示</div>
+      <div className="mt-3 whitespace-pre-wrap text-l3 text-[#2D2D2D]">
+        {loading ? 'AI思考中...' : text}
+      </div>
     </div>
   )
 }
 
-function Step2FormulaRow({
-  leftLabel,
-  operator,
-  values,
-  onChange,
-}: {
-  leftLabel: string
-  operator: string
-  values: string[]
-  onChange: (slotIndex: number, value: string) => void
-}) {
-  return (
-    <div className="flex min-h-[1.75rem] flex-wrap items-center gap-x-1.5 gap-y-2 text-l3 text-[#2D2D2D]">
-      <span>{leftLabel}</span>
-      <span>=</span>
-      <span>（</span>
-      <input
-        type="text"
-        inputMode="decimal"
-        className={step2InputClass}
-        placeholder=""
-        value={values[0] ?? ''}
-        onChange={(e) => onChange(0, e.target.value)}
-        aria-label={`${leftLabel}第一个量`}
-      />
-      <span>）</span>
-      <span>{operator}</span>
-      <span>（</span>
-      <input
-        type="text"
-        inputMode="decimal"
-        className={step2InputClass}
-        placeholder=""
-        value={values[1] ?? ''}
-        onChange={(e) => onChange(1, e.target.value)}
-        aria-label={`${leftLabel}第二个量`}
-      />
-      <span>）</span>
-      <span>=</span>
-      <span>（</span>
-      <input
-        type="text"
-        inputMode="decimal"
-        className={step2InputClass}
-        placeholder=""
-        value={values[2] ?? ''}
-        onChange={(e) => onChange(2, e.target.value)}
-        aria-label={`${leftLabel}结果`}
-      />
-      <span>）</span>
-    </div>
-  )
-}
-
-function Step2FrameworkPanel({
-  question,
-  values,
-  onSlotChange,
-}: {
-  question: QuestionData
-  values: string[][]
-  onSlotChange: (lineIndex: number, slotIndex: number, value: string) => void
-}) {
-  const rows = getStep2FormulaRows(question)
-
-  return (
-    <div className="mt-3 space-y-3">
-      {rows.map((row, lineIndex) => (
-        <Step2FormulaRow
-          key={row.leftLabel}
-          leftLabel={row.leftLabel}
-          operator={row.operator}
-          values={values[lineIndex] ?? ['', '', '']}
-          onChange={(slotIndex, value) => onSlotChange(lineIndex, slotIndex, value)}
-        />
-      ))}
-      <p className="text-l4 text-[#6353AC]/70">{STEP2_REMINDER}</p>
-    </div>
-  )
-}
-
-function EscalationBadge({ stage }: { stage: 'partial' | 'full_support' }) {
-  if (stage === 'partial') {
-    return (
-      <span className="mb-2 inline-flex rounded-full bg-[#C9EBCA] px-2.5 py-0.5 text-xs font-medium text-[#2D5E30]">
-        部分辅助
-      </span>
-    )
-  }
-  return (
-    <span className="mb-2 inline-flex rounded-full bg-[#9F9DF3] px-2.5 py-0.5 text-xs font-medium text-white">
-      全力辅助
-    </span>
-  )
-}
-
-function MoreHintButton({
-  onClick,
-  disabled,
-}: {
-  onClick: () => void
-  disabled?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      className="rounded-[20px] border border-[#9F9DF3] bg-transparent px-3 py-1 text-xs text-[#9F9DF3] hover:bg-[#9F9DF3]/10 disabled:cursor-not-allowed disabled:opacity-50"
-      onClick={onClick}
-      disabled={disabled}
-    >
-      我需要更多提示 ↑
-    </button>
-  )
-}
-
-const checkHintButtonClass =
-  'rounded-2xl bg-[#FF9BB3]/30 px-4 py-2 text-l3 font-semibold text-[#2D2D2D]/60 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 border border-[#FF9BB3]/40 border-1'
-
-function HintActionRow({
-  showEscalation,
+function HintActions({
+  canEscalate,
+  loading,
   onEscalate,
-  escalateDisabled,
-  showCheck,
   onCheck,
-  checkDisabled,
   checkLabel,
 }: {
-  showEscalation: boolean
+  canEscalate: boolean
+  loading: boolean
   onEscalate: () => void
-  escalateDisabled?: boolean
-  showCheck?: boolean
   onCheck?: () => void
-  checkDisabled?: boolean
   checkLabel?: string
 }) {
-  if (!showEscalation && !showCheck) return null
-
+  if (!canEscalate && !onCheck) return null
   return (
     <div className="mt-3 flex items-center gap-3">
-      {showEscalation ? (
-        <MoreHintButton onClick={onEscalate} disabled={escalateDisabled} />
-      ) : null}
-      {showCheck ? (
+      {canEscalate ? (
         <button
           type="button"
-          className={[checkHintButtonClass, 'ml-auto'].join(' ')}
+          className="rounded-[20px] border border-[#9F9DF3] px-3 py-1 text-xs text-[#9F9DF3] disabled:opacity-50"
+          disabled={loading}
+          onClick={onEscalate}
+        >
+          我需要更多提示 ↑
+        </button>
+      ) : null}
+      {onCheck ? (
+        <button
+          type="button"
+          className="ml-auto rounded-2xl border border-[#FF9BB3]/40 bg-[#FF9BB3]/30 px-4 py-2 text-l3 font-semibold text-[#2D2D2D]/60 disabled:opacity-50"
+          disabled={loading}
           onClick={onCheck}
-          disabled={checkDisabled}
         >
           {checkLabel}
         </button>
       ) : null}
     </div>
   )
-}
-
-function AiHintPanel({
-  meta,
-  isLoading,
-  displayText,
-  badge,
-}: {
-  meta: HintCardMeta
-  isLoading: boolean
-  displayText: string
-  badge?: 'partial' | 'full_support' | null
-}) {
-  return (
-    <div className="mt-4">
-      {badge ? <EscalationBadge stage={badge} /> : null}
-      <div
-        className={[
-          'min-h-[3.5rem] rounded-2xl border border-[#C8C9E8] p-4',
-          meta.accentClass,
-          meta.containerClass,
-        ].join(' ')}
-      >
-        <div className="text-l2 text-[#2D2D2D]">{meta.title}</div>
-        {isLoading ? (
-          <div className="mt-3 flex items-center text-l3 text-[#9F9DF3]">
-            <span>AI思考中...</span>
-            <ThinkingDots />
-          </div>
-        ) : displayText ? (
-          <div className="mt-3 whitespace-pre-wrap text-l3 text-[#2D2D2D]">{displayText}</div>
-        ) : (
-          <div className="mt-3 text-l4 text-[#6353AC]"> </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function blankSlotCount(line: string): number {
-  return (line.match(/___/g) ?? []).length
-}
-
-function initSlotRows(lines: string[]): string[][] {
-  return lines.map((line) => Array(blankSlotCount(line)).fill(''))
-}
-
-function emptyInputs(len: number): string[] {
-  return Array(len).fill('')
-}
-
-function falseFlags(len: number): boolean[] {
-  return Array(len).fill(false)
-}
-
-/** 进页初次提示：按 fading 深度调用对应 system prompt */
-async function fetchInitialStep1Hint(
-  question: QuestionData,
-  fadingStage: FadingStage,
-  condition: StudyCondition,
-): Promise<string> {
-  if (condition === 'fading' && fadingStage === 'full_support') {
-    return generateStep1InitialFullSupport(question)
-  }
-
-  const n = question.expectedStep1Values.length
-  if (condition === 'fading' && fadingStage === 'minimal') {
-    return generateStep1Hint(question, 'minimal', emptyInputs(n), falseFlags(n), condition)
-  }
-
-  const stage: FadingStage = condition === 'fixed' ? 'full_support' : fadingStage
-  const placeholders = Array.from({ length: n }, () => '（尚未填写）')
-  return generateStep1Hint(question, stage, placeholders, falseFlags(n), condition)
-}
-
-async function fetchInitialStep2Hint(
-  question: QuestionData,
-  fadingStage: FadingStage,
-  condition: StudyCondition,
-): Promise<string> {
-  return generateStep2InitialHint(question, fadingStage, condition)
 }
 
 export default function StepScaffold({
@@ -388,455 +119,511 @@ export default function StepScaffold({
   forcedFadingStage,
   fixedHints,
 }: StepScaffoldProps) {
-  const storeFadingStage = useLearningStore((s) => s.fadingStage)
-  const fadingStage = forcedFadingStage ?? storeFadingStage
+  const storeStage = useLearningStore((state) => state.fadingStage)
+  const fadingStage = forcedFadingStage ?? storeStage
+  const expectedParts = getExpectedPartCount(question)
 
-  const [numericAnswer, setNumericAnswer] = useState('')
+  const [step1Values, setStep1Values] = useState(['', '', ''])
+  const [step2Values, setStep2Values] = useState(() =>
+    condition === 'no_ai' ? ['', '', ''] : ['1', String(question.factor), ''],
+  )
+  const [answers, setAnswers] = useState(() => question.correctAnswers.map(() => ''))
   const [submitted, setSubmitted] = useState(false)
-
-  const [step1SlotValues, setStep1SlotValues] = useState<string[][]>(() =>
-    initSlotRows(question.step1Hints),
-  )
-  const [step2SlotValues, setStep2SlotValues] = useState<string[][]>(() =>
-    initEmptyStep2Slots(question),
-  )
 
   const [step1Hint, setStep1Hint] = useState(fixedHints?.step1 ?? '')
   const [step2Hint, setStep2Hint] = useState(fixedHints?.step2 ?? '')
   const [step3Hint, setStep3Hint] = useState(fixedHints?.step3 ?? '')
-  const [isLoadingStep1, setIsLoadingStep1] = useState(false)
-  const [isLoadingStep2, setIsLoadingStep2] = useState(false)
-  const [isLoadingStep3, setIsLoadingStep3] = useState(false)
+  const [loadingStep, setLoadingStep] = useState<1 | 2 | 3 | null>(null)
+  const [step1Checks, setStep1Checks] = useState(0)
+  const [step2Checks, setStep2Checks] = useState(0)
 
-  const [step1CheckCount, setStep1CheckCount] = useState(0)
-  const [step2CheckCount, setStep2CheckCount] = useState(0)
+  const [escalatedStages, setEscalatedStages] = useState<Array<FadingStage | null>>([
+    null,
+    null,
+    null,
+  ])
+  const [escalations, setEscalations] = useState([0, 0, 0])
 
-  const [step1EscalatedStage, setStep1EscalatedStage] = useState<FadingStage | null>(null)
-  const [step2EscalatedStage, setStep2EscalatedStage] = useState<FadingStage | null>(null)
-  const [step3EscalatedStage, setStep3EscalatedStage] = useState<FadingStage | null>(null)
-  const [step1Escalations, setStep1Escalations] = useState(0)
-  const [step2Escalations, setStep2Escalations] = useState(0)
-  const [step3Escalations, setStep3Escalations] = useState(0)
+  const problemStartedAtRef = useRef(0)
+  const firstInteractionAtRef = useRef<number | null>(null)
+  const firstHelpRequestAtRef = useRef<number | null>(null)
+  const stepStartedAtRef = useRef<Array<number | null>>([null, null, null])
+  const stepLastInteractionAtRef = useRef<Array<number | null>>([null, null, null])
+  const escalationEventsRef = useRef<SupportEscalationRecord[][]>([[], [], []])
+  const hintExposuresRef = useRef<HintExposureRecord[]>([])
 
   const canUseAi = condition !== 'no_ai'
-  const canEscalateHints = condition === 'fading' && !fixedHints
-  const showHintSection = canUseAi
+  const canRecover = condition === 'fading' && !fixedHints
+  const initialSupportLevel: FadingStage =
+    condition === 'fixed' ? 'full_support' : condition === 'no_ai' ? 'none' : fadingStage
+  const effectiveStages = escalatedStages.map((stage) => stage ?? initialSupportLevel)
 
-  const step1EffectiveStage = effectiveStage(fadingStage, step1EscalatedStage)
-  const step2EffectiveStage = effectiveStage(fadingStage, step2EscalatedStage)
-  const step3EffectiveStage = effectiveStage(fadingStage, step3EscalatedStage)
+  const displayedHintText = useCallback(
+    (text: string, stage: FadingStage) =>
+      condition === 'fading' && stage === 'minimal' ? firstSentenceZh(text) : text,
+    [condition],
+  )
 
-  const shouldLoadInitialHints =
-    !fixedHints && showHintSection && (condition !== 'fading' || fadingStage !== 'none')
+  const recordInteraction = useCallback((step: 1 | 2 | 3) => {
+    const now = Date.now()
+    if (!problemStartedAtRef.current) problemStartedAtRef.current = now
+    if (firstInteractionAtRef.current == null) firstInteractionAtRef.current = now
+    const index = step - 1
+    if (stepStartedAtRef.current[index] == null) stepStartedAtRef.current[index] = now
+    stepLastInteractionAtRef.current[index] = now
+  }, [])
 
-  const step2ExpectedValues = useMemo(() => getStep2ExpectedValues(question), [question])
+  const recordHintExposure = useCallback(
+    (
+      step: 1 | 2 | 3,
+      stage: FadingStage,
+      text: string,
+      source: HintExposureRecord['source'],
+      generatedAt = Date.now(),
+    ) => {
+      const visibleText = displayedHintText(text, stage).trim()
+      if (!visibleText) return
+      hintExposuresRef.current.push({
+        step,
+        supportLevel: stage,
+        hintText: visibleText,
+        source,
+        generatedAt,
+        shownAt: Date.now(),
+      })
+    },
+    [displayedHintText],
+  )
 
-  const stageForMeta: FadingStage = condition === 'fading' ? fadingStage : 'partial'
-  const meta = hintMetaFor(condition, stageForMeta)
+  const displayedHints = useMemo(
+    () =>
+      [step1Hint, step2Hint, step3Hint].map((hint, index) =>
+        displayedHintText(hint, effectiveStages[index]!),
+      ),
+    [displayedHintText, effectiveStages, step1Hint, step2Hint, step3Hint],
+  )
 
   useEffect(() => {
-    if (fixedHints) return
-    if (!shouldLoadInitialHints) return
+    const now = Date.now()
+    problemStartedAtRef.current = now
+    stepStartedAtRef.current[0] = now
+  }, [question.id])
 
+  useEffect(() => {
+    if (fixedHints || !canUseAi || (condition === 'fading' && fadingStage === 'none')) return
     let cancelled = false
-    setIsLoadingStep1(true)
-    setIsLoadingStep2(true)
-    setIsLoadingStep3(true)
-    setStep1Hint('')
-    setStep2Hint('')
-    setStep3Hint('')
-
-    void (async () => {
-      try {
-        const [h1, h2, h3] = await Promise.all([
-          fetchInitialStep1Hint(question, fadingStage, condition),
-          fetchInitialStep2Hint(question, fadingStage, condition),
-          generateStep3Hint(question, fadingStage, condition),
-        ])
-        if (cancelled) return
-        setStep1Hint(h1)
-        setStep2Hint(h2)
-        setStep3Hint(h3)
-      } finally {
-        if (!cancelled) {
-          setIsLoadingStep1(false)
-          setIsLoadingStep2(false)
-          setIsLoadingStep3(false)
-        }
-      }
-    })()
-
+    void Promise.all([
+      condition === 'fading' && fadingStage === 'full_support'
+        ? generateStep1InitialFullSupport(question)
+        : generateStep1Hint(question, fadingStage, ['', '', ''], [false, false, false], condition),
+      generateStep2InitialHint(question, fadingStage, condition),
+      generateStep3Hint(question, fadingStage, condition),
+    ]).then(([hint1, hint2, hint3]) => {
+      if (cancelled) return
+      const generatedAt = Date.now()
+      setStep1Hint(hint1)
+      setStep2Hint(hint2)
+      setStep3Hint(hint3)
+      recordHintExposure(1, initialSupportLevel, hint1, 'initial', generatedAt)
+      recordHintExposure(2, initialSupportLevel, hint2, 'initial', generatedAt)
+      recordHintExposure(3, initialSupportLevel, hint3, 'initial', generatedAt)
+      setLoadingStep(null)
+    })
     return () => {
       cancelled = true
     }
-  }, [question.id, shouldLoadInitialHints, fadingStage, condition, fixedHints, question])
+  }, [canUseAi, condition, fadingStage, fixedHints, initialSupportLevel, question, recordHintExposure])
 
-  const regenerateStep1Hint = useCallback(
-    async (stage: FadingStage) => {
-      if (fixedHints) {
-        setStep1Hint(fixedHints.step1)
-        return
-      }
-      setIsLoadingStep1(true)
+  const regenerateHint = useCallback(
+    async (step: 1 | 2 | 3, stage: FadingStage, checking = false) => {
+      setLoadingStep(step)
       try {
-        const flat = alignStudentToExpected(
-          step1SlotValues.flatMap((row) => [...row]),
-          question.expectedStep1Values.length,
-        )
-        const hasInput = flat.some((s) => String(s).trim())
-        if (hasInput) {
-          const flags = checkHintInputs(flat, question.expectedStep1Values)
-          const text = await generateStep1Hint(question, stage, flat, flags, condition)
-          setStep1Hint(text)
-        } else {
-          const text = await fetchInitialStep1Hint(question, stage, condition)
-          setStep1Hint(text)
+        if (fixedHints) {
+          const hint = [fixedHints.step1, fixedHints.step2, fixedHints.step3 ?? ''][step - 1]!
+          if (step === 1) setStep1Hint(hint)
+          if (step === 2) setStep2Hint(hint)
+          if (step === 3) setStep3Hint(hint)
+          return
         }
-      } finally {
-        setIsLoadingStep1(false)
-      }
-    },
-    [condition, fixedHints, question, step1SlotValues],
-  )
-
-  const regenerateStep2Hint = useCallback(
-    async (stage: FadingStage) => {
-      if (fixedHints) {
-        setStep2Hint(fixedHints.step2)
-        return
-      }
-      setIsLoadingStep2(true)
-      try {
-        const flat = alignStudentToExpected(
-          step2SlotValues.flatMap((row) => [...row]),
-          step2ExpectedValues.length,
-        )
-        const hasInput = flat.some((s) => String(s).trim())
-        if (hasInput) {
-          const flags = checkHintInputs(flat, step2ExpectedValues)
-          const text = await generateStep2Hint(question, stage, flat, flags, condition)
-          setStep2Hint(text)
+        let hint = ''
+        if (step === 1) {
+          const expected = [question.largerLabel, String(question.factor), String(question.knownAmount)]
+          if (!checking) {
+            hint = stage === 'full_support'
+              ? await generateStep1InitialFullSupport(question)
+              : await generateStep1Hint(
+                  question,
+                  stage,
+                  ['', '', ''],
+                  [false, false, false],
+                  condition,
+                )
+          } else {
+            hint = step1Values.every((value) => !value.trim())
+              ? EMPTY_CHECK_HINT
+              : await generateStep1Hint(
+                  question,
+                  stage,
+                  step1Values,
+                  checkHintInputs(step1Values, expected),
+                  condition,
+                )
+          }
+        } else if (step === 2) {
+          if (!checking) {
+            hint = await generateStep2InitialHint(question, stage, condition)
+          } else {
+            const expected = ['1', String(question.factor), String(expectedParts)]
+            hint = step2Values.every((value) => !value.trim())
+              ? EMPTY_CHECK_HINT
+              : await generateStep2Hint(
+                  question,
+                  stage,
+                  step2Values,
+                  checkHintInputs(step2Values, expected),
+                  condition,
+                )
+          }
         } else {
-          const text = await fetchInitialStep2Hint(question, stage, condition)
-          setStep2Hint(text)
+          hint = await generateStep3Hint(question, stage, condition)
         }
+        if (step === 1) setStep1Hint(hint)
+        if (step === 2) setStep2Hint(hint)
+        if (step === 3) setStep3Hint(hint)
+        recordHintExposure(step, stage, hint, checking ? 'check_feedback' : 'help_request')
       } finally {
-        setIsLoadingStep2(false)
+        setLoadingStep(null)
       }
     },
-    [condition, fixedHints, question, step2ExpectedValues, step2SlotValues],
+    [condition, expectedParts, fixedHints, question, recordHintExposure, step1Values, step2Values],
   )
 
-  const regenerateStep3Hint = useCallback(
-    async (stage: FadingStage) => {
-      if (fixedHints) {
-        setStep3Hint(fixedHints.step3 ?? '')
-        return
-      }
-      setIsLoadingStep3(true)
-      try {
-        const text = await generateStep3Hint(question, stage, condition)
-        setStep3Hint(text)
-      } finally {
-        setIsLoadingStep3(false)
-      }
-    },
-    [condition, fixedHints, question],
-  )
-
-  const escalateStep1Hint = useCallback(async () => {
-    const next = escalateStage(step1EffectiveStage)
+  const escalate = (step: 1 | 2 | 3) => {
+    const index = step - 1
+    const next = escalateStage(effectiveStages[index]!)
     if (!next) return
-    setStep1EscalatedStage(next)
-    setStep1Escalations((c) => c + 1)
-    await regenerateStep1Hint(next)
-  }, [regenerateStep1Hint, step1EffectiveStage])
-
-  const escalateStep2Hint = useCallback(async () => {
-    const next = escalateStage(step2EffectiveStage)
-    if (!next) return
-    setStep2EscalatedStage(next)
-    setStep2Escalations((c) => c + 1)
-    await regenerateStep2Hint(next)
-  }, [regenerateStep2Hint, step2EffectiveStage])
-
-  const escalateStep3Hint = useCallback(async () => {
-    const next = escalateStage(step3EffectiveStage)
-    if (!next) return
-    setStep3EscalatedStage(next)
-    setStep3Escalations((c) => c + 1)
-    await regenerateStep3Hint(next)
-  }, [regenerateStep3Hint, step3EffectiveStage])
-
-  const runCheckStep1 = useCallback(async () => {
-    setIsLoadingStep1(true)
-    try {
-      if (fixedHints) {
-        setStep1Hint(fixedHints.step1)
-        return
-      }
-      const flat = alignStudentToExpected(
-        step1SlotValues.flatMap((row) => [...row]),
-        question.expectedStep1Values.length,
-      )
-      if (flat.every((s) => !String(s).trim())) {
-        setStep1Hint(EMPTY_CHECK_HINT)
-        return
-      }
-      const flags = checkHintInputs(flat, question.expectedStep1Values)
-      const text = await generateStep1Hint(
-        question,
-        step1EffectiveStage,
-        flat,
-        flags,
-        condition,
-      )
-      setStep1Hint(text)
-    } finally {
-      setStep1CheckCount((c) => c + 1)
-      setIsLoadingStep1(false)
-    }
-  }, [condition, step1EffectiveStage, question, step1SlotValues, fixedHints])
-
-  const runCheckStep2 = useCallback(async () => {
-    setIsLoadingStep2(true)
-    try {
-      if (fixedHints) {
-        setStep2Hint(fixedHints.step2)
-        return
-      }
-      const flat = alignStudentToExpected(
-        step2SlotValues.flatMap((row) => [...row]),
-        step2ExpectedValues.length,
-      )
-      if (flat.every((s) => !String(s).trim())) {
-        setStep2Hint(EMPTY_CHECK_HINT)
-        return
-      }
-      const flags = checkHintInputs(flat, step2ExpectedValues)
-      const text = await generateStep2Hint(
-        question,
-        step2EffectiveStage,
-        flat,
-        flags,
-        condition,
-      )
-      setStep2Hint(text)
-    } finally {
-      setStep2CheckCount((c) => c + 1)
-      setIsLoadingStep2(false)
-    }
-  }, [condition, step2EffectiveStage, question, step2ExpectedValues, step2SlotValues, fixedHints])
-
-  useEffect(() => {
-    setNumericAnswer('')
-    setSubmitted(false)
-    setStep1Hint(fixedHints?.step1 ?? '')
-    setStep2Hint(fixedHints?.step2 ?? '')
-    setStep3Hint(fixedHints?.step3 ?? '')
-    setIsLoadingStep1(false)
-    setIsLoadingStep2(false)
-    setIsLoadingStep3(false)
-    setStep1CheckCount(0)
-    setStep2CheckCount(0)
-    setStep1EscalatedStage(null)
-    setStep2EscalatedStage(null)
-    setStep3EscalatedStage(null)
-    setStep1Escalations(0)
-    setStep2Escalations(0)
-    setStep3Escalations(0)
-    setStep1SlotValues(initSlotRows(question.step1Hints))
-    setStep2SlotValues(initEmptyStep2Slots(question))
-  }, [question.id, fixedHints])
-
-  const displayStep1Hint = useMemo(() => {
-    if (condition === 'fading' && step1EffectiveStage === 'minimal' && step1Hint) {
-      return firstSentenceZh(step1Hint)
-    }
-    return step1Hint
-  }, [condition, step1EffectiveStage, step1Hint])
-
-  const displayStep2Hint = useMemo(() => {
-    if (condition === 'fading' && step2EffectiveStage === 'minimal' && step2Hint) {
-      return firstSentenceZh(step2Hint)
-    }
-    return step2Hint
-  }, [condition, step2EffectiveStage, step2Hint])
-
-  const displayStep3Hint = useMemo(() => {
-    if (condition === 'fading' && step3EffectiveStage === 'minimal' && step3Hint) {
-      return firstSentenceZh(step3Hint)
-    }
-    return step3Hint
-  }, [condition, step3EffectiveStage, step3Hint])
-
-  const step1EscalationBadge = escalationBadgeStage(step1EscalatedStage)
-  const step2EscalationBadge = escalationBadgeStage(step2EscalatedStage)
-  const step3EscalationBadge = escalationBadgeStage(step3EscalatedStage)
-
-  const showStep1EscalationButton =
-    canEscalateHints && escalateStage(step1EffectiveStage) !== null
-  const showStep2EscalationButton =
-    canEscalateHints && escalateStage(step2EffectiveStage) !== null
-  const showStep3EscalationButton =
-    canEscalateHints && escalateStage(step3EffectiveStage) !== null
-
-  const updateStep1Slot = (lineIndex: number, slotIndex: number, value: string) => {
-    setStep1SlotValues((rows) =>
-      rows.map((row, i) =>
-        i === lineIndex ? row.map((cell, j) => (j === slotIndex ? value : cell)) : row,
-      ),
-    )
+    const now = Date.now()
+    recordInteraction(step)
+    if (firstHelpRequestAtRef.current == null) firstHelpRequestAtRef.current = now
+    escalationEventsRef.current[index]!.push({
+      fromLevel: effectiveStages[index]!,
+      toLevel: next,
+      timestamp: now,
+    })
+    setEscalatedStages((stages) => stages.map((stage, i) => (i === index ? next : stage)))
+    setEscalations((counts) => counts.map((count, i) => (i === index ? count + 1 : count)))
+    void regenerateHint(step, next)
   }
 
-  const updateStep2Slot = (lineIndex: number, slotIndex: number, value: string) => {
-    setStep2SlotValues((rows) =>
-      rows.map((row, i) =>
-        i === lineIndex ? row.map((cell, j) => (j === slotIndex ? value : cell)) : row,
-      ),
-    )
+  const checkStep1 = () => {
+    recordInteraction(1)
+    setStep1Checks((count) => count + 1)
+    void regenerateHint(1, effectiveStages[0]!, true)
+  }
+  const checkStep2 = () => {
+    recordInteraction(2)
+    setStep2Checks((count) => count + 1)
+    void regenerateHint(2, effectiveStages[1]!, true)
   }
 
   const submit = () => {
-    if (submitted) return
-    const n = Number.parseFloat(numericAnswer.trim())
-    if (!Number.isFinite(n)) return
+    const numericAnswers = answers.map((value) => Number.parseFloat(value.trim()))
+    if (submitted || numericAnswers.some((value) => !Number.isFinite(value))) return
+    recordInteraction(3)
+    const completedAt = Date.now()
+    const problemStartedAt = problemStartedAtRef.current || completedAt
+    const step1Correctness = checkHintInputs(step1Values, [
+      question.largerLabel,
+      String(question.factor),
+      String(question.knownAmount),
+    ])
+    const step2Correctness = checkHintInputs(step2Values, [
+      '1',
+      String(question.factor),
+      String(expectedParts),
+    ])
+    const step3Values = answers.map((value) => value.trim())
+    const step3Correctness = checkHintInputs(
+      step3Values,
+      question.correctAnswers.map(String),
+    )
+    const enteredByStep = [step1Values, step2Values, step3Values]
+    const correctnessByStep = [step1Correctness, step2Correctness, step3Correctness]
+    const checkCounts = [step1Checks, step2Checks, 0]
+
+    const makeStepRecord = (step: 1 | 2 | 3): StepProcessRecord => {
+      const index = step - 1
+      const startedAt = stepStartedAtRef.current[index] ?? problemStartedAt
+      const endedAt = stepLastInteractionAtRef.current[index] ?? completedAt
+      const displayedHintsForStep = hintExposuresRef.current.filter((hint) => hint.step === step)
+      return {
+        enteredValues: [...enteredByStep[index]!],
+        fieldCorrectness: [...correctnessByStep[index]!],
+        isCorrect: correctnessByStep[index]!.every(Boolean),
+        checkCount: checkCounts[index]!,
+        stepStartedAt: startedAt,
+        stepCompletedAt: endedAt,
+        stepTime: elapsedSeconds(startedAt, endedAt),
+        initialSupportLevel,
+        actualSupportLevelShown: effectiveStages[index]!,
+        aiSupportShown: displayedHintsForStep.length > 0,
+        helpRequestCount: escalations[index]!,
+        supportEscalations: [...escalationEventsRef.current[index]!],
+        displayedHints: displayedHintsForStep,
+      }
+    }
+
     setSubmitted(true)
-    onSubmit(n, {
-      step1Escalations,
-      step2Escalations,
-      step3Escalations,
+    onSubmit(numericAnswers, {
+      step1Escalations: escalations[0]!,
+      step2Escalations: escalations[1]!,
+      step3Escalations: escalations[2]!,
+      steps: {
+        step1: makeStepRecord(1),
+        step2: makeStepRecord(2),
+        step3: makeStepRecord(3),
+      },
+      timing: {
+        problemStartedAt,
+        problemCompletedAt: completedAt,
+        totalProblemTime: elapsedSeconds(problemStartedAt, completedAt),
+        timeToFirstInteraction:
+          firstInteractionAtRef.current == null
+            ? null
+            : elapsedSeconds(problemStartedAt, firstInteractionAtRef.current),
+        timeBeforeFirstHelpRequest:
+          firstHelpRequestAtRef.current == null
+            ? null
+            : elapsedSeconds(problemStartedAt, firstHelpRequestAtRef.current),
+      },
     })
   }
 
+  const unit = question.answerUnits[0] ?? ''
+  const isRibbonLengthQuestion = question.id === 'm004'
+  const showRecovery = (index: number) =>
+    canRecover && escalateStage(effectiveStages[index]!) !== null
+
   return (
-    <div className="space-y-4">
-      <div className="app-card p-5">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="inline-flex rounded-full bg-[#FF9BB3]/30 px-3 py-1 text-l3 font-medium text-[#2D2D2D] border border-[#FF9BB3]/40 border-1">
-              {question.subject}
-            </div>
-            <div className="text-question mt-3 text-[#2D2D2D]">{question.content}</div>
-          </div>
+    <div className="app-card p-5">
+      <div className="inline-flex rounded-full border border-[#FF9BB3]/40 bg-[#FF9BB3]/30 px-3 py-1 text-l3 font-medium text-[#2D2D2D]">
+        {question.subject}
+      </div>
+      <div className="text-question mt-3 text-[#2D2D2D]">{question.content}</div>
+
+      <section className="mt-4 rounded-2xl border border-[#C8C9E8] bg-white p-4">
+        <div className="text-l2 text-[#2D2D2D]">Step 1 — 读题理解</div>
+        <div className="mt-3 space-y-3 text-l3 text-[#2D2D2D]">
+          <label className="flex flex-wrap items-center gap-2">
+            <select
+              className={inputClass}
+              value={step1Values[0]}
+              onChange={(event) => {
+                recordInteraction(1)
+                setStep1Values((values) => [event.target.value, values[1]!, values[2]!])
+              }}
+            >
+              <option value="">请选择</option>
+              <option value={question.baseLabel}>{question.baseLabel}</option>
+              <option value={question.largerLabel}>{question.largerLabel}</option>
+            </select>
+            <span>{isRibbonLengthQuestion ? '的长度更长' : '的数量更多'}</span>
+          </label>
+          <label className="flex flex-wrap items-center gap-2">
+            <span>
+              {question.largerLabel}{isRibbonLengthQuestion ? '的长度是' : '的数量是'}
+              {question.baseLabel}的
+            </span>
+            <input
+              className={inputClass}
+              type="number"
+              inputMode="decimal"
+              aria-label="倍数"
+              value={step1Values[1]}
+              onChange={(event) => {
+                recordInteraction(1)
+                setStep1Values((values) => [values[0]!, event.target.value, values[2]!])
+              }}
+            />
+            <span>倍</span>
+          </label>
+          <label className="flex flex-wrap items-center gap-2">
+            <span>{question.subtype === 'sum' ? '总数是' : '数量差是'}</span>
+            <input
+              className={inputClass}
+              type="number"
+              inputMode="decimal"
+              aria-label={question.subtype === 'sum' ? '总数' : '差'}
+              value={step1Values[2]}
+              onChange={(event) => {
+                recordInteraction(1)
+                setStep1Values((values) => [values[0]!, values[1]!, event.target.value])
+              }}
+            />
+            <span>{unit}</span>
+          </label>
         </div>
+        {canUseAi ? (
+          <>
+            <HintPanel loading={loadingStep === 1} text={displayedHints[0] ?? ''} />
+            <HintActions
+              canEscalate={showRecovery(0)} loading={loadingStep === 1}
+              onEscalate={() => escalate(1)} onCheck={checkStep1}
+              checkLabel={step1Checks ? '重新检查' : '检查一下'}
+            />
+          </>
+        ) : null}
+      </section>
 
-        {/* Step 1 */}
-        <div className="rounded-2xl border border-[#C8C9E8] bg-white p-4">
-          <div className="text-l2 text-[#2D2D2D]">Step 1 — 读题理解</div>
-          <FillableHintRows
-            lines={question.step1Hints}
-            values={step1SlotValues}
-            onSlotChange={updateStep1Slot}
-          />
-
-          {showHintSection ? (
+      <section className="mt-4 rounded-2xl border border-[#C8C9E8] bg-white p-4">
+        <div className="text-l2 text-[#2D2D2D]">Step 2 — 列份数关系</div>
+        <div className="mt-3 space-y-2 text-l3 text-[#2D2D2D]">
+          <div className="mb-3">请用“份”表示两个数量之间的关系：</div>
+          {condition === 'no_ai' ? (
             <>
-              <AiHintPanel
-                meta={meta}
-                isLoading={isLoadingStep1}
-                displayText={displayStep1Hint}
-                badge={step1EscalationBadge}
-              />
-              <HintActionRow
-                showEscalation={showStep1EscalationButton}
-                onEscalate={() => void escalateStep1Hint()}
-                escalateDisabled={isLoadingStep1}
-                showCheck
-                onCheck={() => void runCheckStep1()}
-                checkDisabled={isLoadingStep1}
-                checkLabel={step1CheckCount > 0 ? '重新检查' : '检查一下'}
-              />
+              <label className="flex flex-wrap items-center gap-2">
+                <span>{question.baseLabel}：</span>
+                <input
+                  className={inputClass}
+                  type="number"
+                  inputMode="decimal"
+                  aria-label={`${question.baseLabel}的份数`}
+                  value={step2Values[0]}
+                  onChange={(event) => {
+                    recordInteraction(2)
+                    setStep2Values((values) => [event.target.value, values[1]!, values[2]!])
+                  }}
+                />
+                <span>份</span>
+              </label>
+              <label className="flex flex-wrap items-center gap-2">
+                <span>{question.largerLabel}：</span>
+                <input
+                  className={inputClass}
+                  type="number"
+                  inputMode="decimal"
+                  aria-label={`${question.largerLabel}的份数`}
+                  value={step2Values[1]}
+                  onChange={(event) => {
+                    recordInteraction(2)
+                    setStep2Values((values) => [values[0]!, event.target.value, values[2]!])
+                  }}
+                />
+                <span>份</span>
+              </label>
             </>
-          ) : null}
-        </div>
-
-        {/* Step 2 — 列框架：固定公式填空 */}
-        <div className="mt-4 rounded-2xl border border-[#C8C9E8] bg-white p-4">
-          <div className="text-l2 text-[#2D2D2D]">Step 2 — 列框架</div>
-          <Step2FrameworkPanel
-            question={question}
-            values={step2SlotValues}
-            onSlotChange={updateStep2Slot}
-          />
-
-          {showHintSection ? (
+          ) : (
             <>
-              <AiHintPanel
-                meta={meta}
-                isLoading={isLoadingStep2}
-                displayText={displayStep2Hint}
-                badge={step2EscalationBadge}
-              />
-              <HintActionRow
-                showEscalation={showStep2EscalationButton}
-                onEscalate={() => void escalateStep2Hint()}
-                escalateDisabled={isLoadingStep2}
-                showCheck
-                onCheck={() => void runCheckStep2()}
-                checkDisabled={isLoadingStep2}
-                checkLabel={step2CheckCount > 0 ? '重新检查' : '检查一下'}
-              />
+              <div>{question.baseLabel}：1份</div>
+              <div>{question.largerLabel}：{question.factor}份</div>
             </>
-          ) : null}
+          )}
+          <label className="flex flex-wrap items-center gap-2 font-semibold">
+            <span>{getPartRelationshipLabel(question)}：</span>
+            <input
+              className={inputClass}
+              type="number"
+              inputMode="decimal"
+              aria-label={question.subtype === 'sum' ? '总份数' : '相差份数'}
+              value={step2Values[2]}
+              onChange={(event) => {
+                recordInteraction(2)
+                setStep2Values((values) => [values[0]!, values[1]!, event.target.value])
+              }}
+            />
+            <span>份</span>
+          </label>
         </div>
+        {canUseAi ? (
+          <>
+            <HintPanel loading={loadingStep === 2} text={displayedHints[1] ?? ''} />
+            <HintActions
+              canEscalate={showRecovery(1)} loading={loadingStep === 2}
+              onEscalate={() => escalate(2)} onCheck={checkStep2}
+              checkLabel={step2Checks ? '重新检查' : '检查一下'}
+            />
+          </>
+        ) : null}
+      </section>
 
-        {/* Step 3 — 草稿计算 */}
-        <div className="mt-4 rounded-2xl border border-[#C8C9E8] bg-white p-4">
-          <div className="text-l2 text-[#2D2D2D]">Step 3 — 草稿计算</div>
-          <div className="mt-3 rounded-2xl bg-[#FF9BB3]/30 px-4 py-3 text-l3 text-[#2D2D2D]/60 border border-[#FF9BB3]/40 border-1">
-            请在草稿纸上完成计算
-          </div>
-
-          {showHintSection ? (
-            <>
-              <AiHintPanel
-                meta={meta}
-                isLoading={isLoadingStep3}
-                displayText={displayStep3Hint}
-                badge={step3EscalationBadge}
-              />
-              <HintActionRow
-                showEscalation={showStep3EscalationButton}
-                onEscalate={() => void escalateStep3Hint()}
-                escalateDisabled={isLoadingStep3}
-              />
-            </>
-          ) : null}
-        </div>
-
-        {/* Step 4 — 填写答案 */}
-        <div className="mt-4 rounded-2xl border border-[#C8C9E8] bg-white p-4">
-          <div className="text-l2 text-[#2D2D2D]">Step 4 — 填写答案</div>
-          <p className="mt-2 text-l3 leading-relaxed text-[#2D2D2D]">{question.answerLabel}</p>
-          <div className="mt-3 flex flex-wrap items-end gap-2">
-            <label className="text-l3 text-[#2D2D2D]">
-              <span className="sr-only">答案数值</span>
+      <section className="mt-4 rounded-2xl border border-[#C8C9E8] bg-white p-4">
+        <div className="text-l2 text-[#2D2D2D]">Step 3 — 计算并作答</div>
+        <div className="mt-3 space-y-4 text-l3 text-[#2D2D2D]">
+          <label className="block">
+            <span className="block font-semibold">
+              {condition === 'no_ai' ? `${question.baseLabel}：` : `${question.baseLabel}（1份）：`}
+            </span>
+            <span className="mt-1 flex flex-wrap items-center gap-2">
+              <span>
+                {question.subtype === 'sum' ? '总数 ÷ 总份数' : '数量差 ÷ 相差份数'} ={' '}
+                {condition === 'no_ai'
+                  ? null
+                  : `${question.knownAmount} ÷ ${step2Values[2] || '？'} =`}
+              </span>
               <input
+                className={inputClass}
                 type="number"
                 inputMode="decimal"
-                className="mt-1 w-36 rounded-2xl border border-[#9F9DF3] px-3 py-2 text-l3 text-[#2D2D2D] outline-none focus:border-[#6353AC] focus:ring-2 focus:ring-[#9F9DF3]/30"
-                value={numericAnswer}
-                onChange={(e) => setNumericAnswer(e.target.value)}
+                aria-label={`${question.baseLabel}的答案`}
+                value={answers[0] ?? ''}
+                onChange={(event) => {
+                  recordInteraction(3)
+                  setAnswers((values) => [event.target.value, values[1] ?? ''])
+                }}
                 disabled={submitted}
-                placeholder="填写数字"
               />
-            </label>
-            <span className="pb-2 text-l4 font-medium text-[#6353AC]">{question.answerUnit}</span>
-          </div>
-
-          <div className="mt-4 flex items-center justify-end">
-            <button
-              type="button"
-              className="app-btn-primary rounded-2xl px-5 py-2.5 disabled:opacity-50"
-              disabled={submitted || !numericAnswer.trim()}
-              onClick={submit}
-            >
-              提交答案
-            </button>
-          </div>
+              <span>{question.answerUnits[0]}</span>
+            </span>
+          </label>
+          <label className="block">
+            <span className="block font-semibold">
+              {condition === 'no_ai'
+                ? `${question.largerLabel}：`
+                : `${question.largerLabel}（${question.factor}份）：`}
+            </span>
+            <span className="mt-1 flex flex-wrap items-center gap-2">
+              <span>
+                1份的数量 × 倍数 ={' '}
+                {condition === 'no_ai'
+                  ? null
+                  : `${answers[0] || '？'} × ${question.factor} =`}
+              </span>
+              <input
+                className={inputClass}
+                type="number"
+                inputMode="decimal"
+                aria-label={`${question.largerLabel}的答案`}
+                value={answers[1] ?? ''}
+                onChange={(event) => {
+                  recordInteraction(3)
+                  setAnswers((values) => [values[0] ?? '', event.target.value])
+                }}
+                disabled={submitted}
+              />
+              <span>{question.answerUnits[1]}</span>
+            </span>
+          </label>
         </div>
-      </div>
+        {canUseAi ? (
+          <>
+            <HintPanel loading={loadingStep === 3} text={displayedHints[2] ?? ''} />
+            <HintActions
+              canEscalate={showRecovery(2)} loading={loadingStep === 3}
+              onEscalate={() => escalate(3)}
+            />
+          </>
+        ) : null}
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            className="app-btn-primary rounded-2xl px-5 py-2.5 disabled:opacity-50"
+            disabled={submitted || answers.some((value) => !value.trim())}
+            onClick={submit}
+          >
+            提交答案
+          </button>
+        </div>
+      </section>
     </div>
   )
 }

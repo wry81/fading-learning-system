@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useLearningStore } from '../store/learningStore'
+import { persistCurrentSession } from '../utils/sessionPersistence'
 
 function todayLabel() {
   return new Date().toLocaleDateString('zh-CN', {
@@ -14,6 +16,10 @@ function todayLabel() {
 export default function Completion() {
   const navigate = useNavigate()
   const questionHistory = useLearningStore((s) => s.questionHistory)
+
+  useEffect(() => {
+    persistCurrentSession()
+  }, [])
 
   return (
     <div className="app-page flex min-h-screen items-center justify-center py-4">

@@ -10,8 +10,7 @@ export interface BKTParams {
 
 /** Default parameters (from Corbett & Anderson 1995) */
 export const DEFAULT_BKT_PARAMS: Record<string, BKTParams> = {
-  求时间: { pL0: 0.05, pT: 0.1, pS: 0.1, pG: 0.05 },
-  求路程: { pL0: 0.05, pT: 0.1, pS: 0.1, pG: 0.05 },
+  倍数份数关系: { pL0: 0.05, pT: 0.1, pS: 0.1, pG: 0.05 },
 }
 
 export const BKT_SKILL_NAMES = Object.keys(DEFAULT_BKT_PARAMS)
@@ -54,7 +53,7 @@ export function pLtoAbilityLevel(pL: number): number {
 }
 
 /** Map pretest score to P(L0); pretestScore: number of correct answers (0-5) */
-export function pretestToPL0(pretestScore: number, _totalQuestions: number = 5): number {
+export function pretestToPL0(pretestScore: number): number {
   const mapping: Record<number, number> = {
     0: 0.05,
     1: 0.15,

@@ -3,27 +3,27 @@ import { useNavigate } from 'react-router-dom'
 
 import StepScaffold from '../components/StepScaffold'
 import { getTutorialQuestion } from '../data/questions'
+import { useLearningStore } from '../store/learningStore'
+import type { FadingStage, StudyCondition } from '../types'
+
+const TUTORIAL_STAGE: Record<StudyCondition, FadingStage> = {
+  fading: 'partial',
+  fixed: 'full_support',
+  no_ai: 'none',
+}
 
 export default function Tutorial() {
   const navigate = useNavigate()
   const tutorialQuestion = useMemo(() => getTutorialQuestion(), [])
-
-  const [step1Hint] = useState(
-    '找找题目里有几个数字？哪个是铅笔的数量，哪个是总价格？',
-  )
-  const [step2Hint] = useState(
-    '先用总价格 ÷ 铅笔数量，算出每支铅笔的价格。再用每支价格 × 要买的数量，就是所求总价。',
-  )
-  const [step3Hint] = useState(
-    '用每支铅笔的价格乘以16，在草稿纸上算出总共需要多少钱。',
-  )
+  const condition = useLearningStore((state) => state.condition) ?? 'fading'
+  const tutorialStage = TUTORIAL_STAGE[condition]
 
   const [scaffoldKey, setScaffoldKey] = useState(0)
   const [completed, setCompleted] = useState(false)
   const [lastWrong, setLastWrong] = useState(false)
 
-  const handleSubmit = (answer: number) => {
-    if (answer === tutorialQuestion.correctAnswer) {
+  const handleSubmit = (answers: number[]) => {
+    if (answers.every((answer, index) => answer === tutorialQuestion.correctAnswers[index])) {
       setLastWrong(false)
       setCompleted(true)
       return
@@ -64,20 +64,23 @@ export default function Tutorial() {
           </p>
         </header>
 
-        <div className="rounded-2xl border border-[#FFD93D] bg-[#FFF9E6] px-4 py-3 text-l3 text-[#6353AC]">
-          💡 按照步骤一步一步来，不会的地方可以看AI提示
-        </div>
+        {condition === 'fading' ? (
+          <div className="rounded-2xl border border-[#FFD93D] bg-[#FFF9E6] px-4 py-3 text-l3 text-[#6353AC]">
+            💡 本次练习从部分提示开始；如果觉得提示不够，可以点击“我需要更多提示”体验获得更多帮助。
+          </div>
+        ) : null}
+
+        {condition === 'fixed' ? (
+          <div className="rounded-2xl border border-[#FFD93D] bg-[#FFF9E6] px-4 py-3 text-l3 text-[#6353AC]">
+            💡 按照步骤一步一步来，系统会提供完整提示。
+          </div>
+        ) : null}
 
         <StepScaffold
           key={scaffoldKey}
           question={tutorialQuestion}
-          condition="fading"
-          forcedFadingStage="full_support"
-          fixedHints={{
-            step1: step1Hint,
-            step2: step2Hint,
-            step3: step3Hint,
-          }}
+          condition={condition}
+          forcedFadingStage={tutorialStage}
           onSubmit={handleSubmit}
         />
 

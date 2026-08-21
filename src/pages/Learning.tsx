@@ -6,11 +6,10 @@ import LevelUpAnimation from '../components/LevelUpAnimation'
 import StepScaffold, { type StepSubmitMeta } from '../components/StepScaffold'
 import { experimentQuestions } from '../data/questions'
 import { useLearningStore } from '../store/learningStore'
-import type { FadingStage, SkillType, StudyCondition } from '../types'
+import type { AnswerRecord, FadingStage, SkillType, StudyCondition } from '../types'
 
 const SKILL_TYPE_HEADER: Record<SkillType, string> = {
-  求时间: '求相遇时间',
-  求路程: '求总路程',
+  倍数份数关系: '倍数份数关系',
 }
 
 export default function Learning() {
@@ -21,6 +20,9 @@ export default function Learning() {
   const currentSkillType = useLearningStore((s) => s.currentSkillType)
   const updateBKTAfterAnswer = useLearningStore((s) => s.updateBKTAfterAnswer)
   const loadActiveSkill = useLearningStore((s) => s.loadActiveSkill)
+  const currentParticipantId = useLearningStore((s) => s.currentParticipantId)
+  const sessionStartTime = useLearningStore((s) => s.sessionStartTime)
+  const setPendingAnswerRecord = useLearningStore((s) => s.setPendingAnswerRecord)
 
   const filteredQuestions = useMemo(
     () => (currentSkillType ? experimentQuestions(currentSkillType) : []),
@@ -50,7 +52,11 @@ export default function Learning() {
 
   const correctAnswerText = useMemo(() => {
     if (!currentQuestion) return ''
-    return `${currentQuestion.correctAnswer}${currentQuestion.answerUnit}`
+    return currentQuestion.correctAnswers
+      .map((answer, index) =>
+        `${currentQuestion.answerLabels[index]}：${answer}${currentQuestion.answerUnits[index]}`,
+      )
+      .join('；')
   }, [currentQuestion])
 
   const [submitted, setSubmitted] = useState(false)
@@ -70,10 +76,10 @@ export default function Learning() {
       subject: string
       skillType: SkillType
       questionId: string
-      userAnswer: number
       step1Escalations: number
       step2Escalations: number
       step3Escalations: number
+      answerRecord: AnswerRecord
     }
   } | null>(null)
 
@@ -91,13 +97,60 @@ export default function Learning() {
     }
   }
 
-  const handleSubmit = (answer: number, meta: StepSubmitMeta) => {
+  const handleSubmit = (answers: number[], meta: StepSubmitMeta) => {
     if (submitted) return
-    const correct = answer === currentQuestion.correctAnswer
+    const correct =
+      answers.length === currentQuestion.correctAnswers.length &&
+      answers.every((answer, index) => answer === currentQuestion.correctAnswers[index])
     setSubmitted(true)
     setIsCorrect(correct)
 
     const bktResult = updateBKTAfterAnswer(currentQuestion.skillType, correct)
+    const submittedAt = Date.now()
+
+    const answerRecord: AnswerRecord = {
+      participantId: currentParticipantId ?? '',
+      condition,
+      sessionId: sessionStartTime ?? submittedAt,
+      questionId: currentQuestion.id,
+      questionOrder: currentQuestionIndex + 1,
+      questionContent: currentQuestion.content,
+      subject: currentQuestion.subject,
+      skillType: currentQuestion.skillType,
+      targetKnowledgeComponent: currentQuestion.skillType,
+      questionSubtype: currentQuestion.subtype,
+      userAnswers: answers,
+      smallerQuantityAnswer: answers[0] ?? Number.NaN,
+      largerQuantityAnswer: answers[1] ?? Number.NaN,
+      correctAnswers: [...currentQuestion.correctAnswers],
+      isCorrect: correct,
+      timeSpent: meta.timing.totalProblemTime,
+      timestamp: submittedAt,
+      submittedAt,
+      fadingStageAtTime: bktResult.previousStage,
+      reflectionText: '',
+      reflectionSkipped: false,
+      reflectionSubmittedAt: null,
+      perceivedOwnership: null,
+      perceivedDifficulty: null,
+      pLBefore: bktResult.pLBefore,
+      pLAfter: bktResult.pLAfter,
+      step1Escalations: meta.step1Escalations,
+      step2Escalations: meta.step2Escalations,
+      step3Escalations: meta.step3Escalations,
+      steps: meta.steps,
+      timing: meta.timing,
+      bkt: {
+        pLBefore: bktResult.pLBefore,
+        pLAfter: bktResult.pLAfter,
+        fadingStageBefore: bktResult.previousStage,
+        fadingStageAfter: bktResult.newStage,
+        consecutiveCorrectBefore: bktResult.consecutiveCorrectBefore,
+        consecutiveCorrectAfter: bktResult.consecutiveCorrect,
+        fadingTransitionOccurred: bktResult.stageChanged,
+      },
+    }
+    setPendingAnswerRecord(answerRecord)
 
     const reflectionState = {
       questionContent: currentQuestion.content,
@@ -106,7 +159,7 @@ export default function Learning() {
       subject: currentQuestion.subject,
       skillType: currentQuestion.skillType,
       questionId: currentQuestion.id,
-      userAnswer: answer,
+      answerRecord,
       ...meta,
     }
 

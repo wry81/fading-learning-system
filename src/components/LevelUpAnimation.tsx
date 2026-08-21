@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 
+import successImage from '../assets/success.png'
 import type { FadingStage } from '../types'
 
 export interface LevelUpAnimationProps {
@@ -55,7 +56,9 @@ export default function LevelUpAnimation(props: LevelUpAnimationProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-col items-center text-center">
-          <div className="text-[64px] leading-none text-[#FF9BB3]"><img src="/src/assets/success.png"width="200" height="200" alt="目标" /></div>
+          <div className="text-[64px] leading-none text-[#FF9BB3]">
+            <img src={successImage} width="200" height="200" alt="能力提升" />
+          </div>
           <div className="mt-2 text-l1 text-[#6353AC]">能力提升了！</div>
           <div className="mt-1 text-l4 font-medium text-[#6353AC]">
             等级 {previousLevel} → 等级 {newLevel}

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 import { experimentQuestions } from '../data/questions'
 import {
@@ -14,6 +15,7 @@ import type {
   Question,
   SkillType,
   StudyCondition,
+  Session,
 } from '../types'
 
 export type SkillState = {
@@ -32,10 +34,11 @@ export type BKTUpdateResult = {
   newStage: FadingStage
   levelIncreased: boolean
   stageChanged: boolean
+  consecutiveCorrectBefore: number
   consecutiveCorrect: number
 }
 
-const SKILL_TYPES: SkillType[] = ['求时间', '求路程']
+const SKILL_TYPES: SkillType[] = ['倍数份数关系']
 
 const STAGE_ORDER: FadingStage[] = ['full_support', 'partial', 'minimal', 'none']
 
@@ -82,8 +85,7 @@ function createSkillState(pL0: number): SkillState {
 
 function defaultSkillStates(pL0: number = 0.05): Record<string, SkillState> {
   return {
-    求时间: createSkillState(pL0),
-    求路程: createSkillState(pL0),
+    倍数份数关系: createSkillState(pL0),
   }
 }
 
@@ -93,8 +95,7 @@ export function ensureSkillStates(
   const base = defaultSkillStates()
   if (!states) return base
   return {
-    求时间: states['求时间'] ?? base['求时间']!,
-    求路程: states['求路程'] ?? base['求路程']!,
+    倍数份数关系: states['倍数份数关系'] ?? base['倍数份数关系']!,
   }
 }
 
@@ -114,6 +115,7 @@ type LearningState = {
   currentQuestion: Question | null
   currentQuestionIndex: number
   sessionStartTime: number | null
+  pendingAnswerRecord: AnswerRecord | null
 
   /** Per-skill BKT + fading progress */
   skillStates: Record<string, SkillState>
@@ -129,6 +131,7 @@ type LearningState = {
   setCondition: (condition: StudyCondition) => void
   setCurrentParticipantId: (id: string | null) => void
   addAnswerRecord: (record: AnswerRecord) => void
+  setPendingAnswerRecord: (record: AnswerRecord | null) => void
   addFadingEvent: (event: FadingEvent) => void
   setCurrentQuestion: (question: Question | null) => void
   setCurrentQuestionIndex: (index: number) => void
@@ -137,6 +140,7 @@ type LearningState = {
   setCurrentSkillType: (skill: SkillType) => void
   markSkillCompleted: (skill: SkillType) => void
   repairSkillStates: () => void
+  restoreFromSession: (session: Session | null) => void
   updateBKTAfterAnswer: (skill: string, isCorrect: boolean) => BKTUpdateResult
   startSession: () => void
   resetSession: () => void
@@ -156,13 +160,14 @@ const initialState = {
   currentQuestion: null as Question | null,
   currentQuestionIndex: 0,
   sessionStartTime: null as number | null,
+  pendingAnswerRecord: null as AnswerRecord | null,
   skillStates: initialSkillStates,
   bktState: bktStateFromSkillStates(initialSkillStates),
   pretestScore: 0,
   completedSkills: {} as Partial<Record<SkillType, boolean>>,
 }
 
-export const useLearningStore = create<LearningState>((set, get) => ({
+export const useLearningStore = create<LearningState>()(persist((set, get) => ({
   ...initialState,
 
   setAbilityLevel: (level: number) => set({ abilityLevel: level }),
@@ -170,7 +175,14 @@ export const useLearningStore = create<LearningState>((set, get) => ({
   setCondition: (condition: StudyCondition) => set({ condition }),
   setCurrentParticipantId: (id: string | null) => set({ currentParticipantId: id }),
   addAnswerRecord: (record: AnswerRecord) =>
-    set((state) => ({ questionHistory: [...state.questionHistory, record] })),
+    set((state) => ({
+      questionHistory: state.questionHistory.some(
+        (item) => item.questionId === record.questionId && item.timestamp === record.timestamp,
+      )
+        ? state.questionHistory
+        : [...state.questionHistory, record],
+    })),
+  setPendingAnswerRecord: (record: AnswerRecord | null) => set({ pendingAnswerRecord: record }),
   addFadingEvent: (event: FadingEvent) =>
     set((state) => ({ fadingHistory: [...state.fadingHistory, event] })),
   setCurrentQuestion: (question: Question | null) => set({ currentQuestion: question }),
@@ -187,6 +199,7 @@ export const useLearningStore = create<LearningState>((set, get) => ({
       currentSkillType: null,
       fadingStage: 'full_support',
       abilityLevel: 1,
+      completedSkills: {},
     })
   },
 
@@ -235,15 +248,43 @@ export const useLearningStore = create<LearningState>((set, get) => ({
     })
   },
 
+  restoreFromSession: (session: Session | null) => {
+    if (!session?.skillStatesAtEnd) {
+      const skillStates = defaultSkillStates()
+      set({
+        skillStates,
+        bktState: bktStateFromSkillStates(skillStates),
+        completedSkills: {},
+        activeSkill: null,
+        currentSkillType: null,
+        fadingStage: 'full_support',
+        abilityLevel: 1,
+      })
+      return
+    }
+
+    const skillStates = ensureSkillStates(session.skillStatesAtEnd)
+    set({
+      skillStates,
+      bktState: bktStateFromSkillStates(skillStates),
+      completedSkills: session.completedSkillsAtEnd ?? {},
+      activeSkill: null,
+      currentSkillType: null,
+      fadingStage: session.fadingStageAtEnd,
+      abilityLevel: session.abilityLevelAtEnd,
+    })
+  },
+
   updateBKTAfterAnswer: (skill: string, isCorrect: boolean) => {
     const state = get()
-    const params = DEFAULT_BKT_PARAMS[skill] ?? DEFAULT_BKT_PARAMS['求时间']!
+    const params = DEFAULT_BKT_PARAMS[skill] ?? DEFAULT_BKT_PARAMS['倍数份数关系']!
     const current = state.skillStates[skill] ?? createSkillState(params.pL0)
 
     const pLBefore = current.pL
     const pLAfter = updateBKT(pLBefore, isCorrect, params)
 
-    let consecutiveCorrect = current.consecutiveCorrect
+    const consecutiveCorrectBefore = current.consecutiveCorrect
+    let consecutiveCorrect = consecutiveCorrectBefore
     if (isCorrect) {
       consecutiveCorrect += 1
     } else {
@@ -346,6 +387,7 @@ export const useLearningStore = create<LearningState>((set, get) => ({
       newStage,
       levelIncreased: newLevel > previousLevel,
       stageChanged,
+      consecutiveCorrectBefore,
       consecutiveCorrect,
     }
   },
@@ -358,6 +400,7 @@ export const useLearningStore = create<LearningState>((set, get) => ({
       currentQuestion: null,
       currentQuestionIndex: 0,
       currentSkillType: null,
+      pendingAnswerRecord: null,
       sessionStartTime: Date.now(),
     })),
 
@@ -369,6 +412,26 @@ export const useLearningStore = create<LearningState>((set, get) => ({
       bktState: bktStateFromSkillStates(skillStates),
     })
   },
+}), {
+  name: 'fading-learning-active-session-v1',
+  version: 1,
+  partialize: (state) => ({
+    abilityLevel: state.abilityLevel,
+    fadingStage: state.fadingStage,
+    activeSkill: state.activeSkill,
+    currentSkillType: state.currentSkillType,
+    condition: state.condition,
+    currentParticipantId: state.currentParticipantId,
+    questionHistory: state.questionHistory,
+    fadingHistory: state.fadingHistory,
+    currentQuestionIndex: state.currentQuestionIndex,
+    sessionStartTime: state.sessionStartTime,
+    pendingAnswerRecord: state.pendingAnswerRecord,
+    skillStates: state.skillStates,
+    bktState: state.bktState,
+    pretestScore: state.pretestScore,
+    completedSkills: state.completedSkills,
+  }),
 }))
 
 export { SKILL_TYPES }
