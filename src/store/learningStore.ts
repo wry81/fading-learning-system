@@ -220,11 +220,12 @@ export const useLearningStore = create<LearningState>()(persist((set, get) => ({
     const state = get()
     const skillStates = ensureSkillStates(state.skillStates)
     const skillState = skillStates[skill]
+    const isResumingSkill = state.currentSkillType === skill
     if (skillState) {
       set({
         skillStates,
         currentSkillType: skill,
-        currentQuestionIndex: 0,
+        currentQuestionIndex: isResumingSkill ? state.currentQuestionIndex : 0,
         activeSkill: skill,
         fadingStage: skillState.fadingStage,
         abilityLevel: skillState.abilityLevel,
@@ -264,12 +265,20 @@ export const useLearningStore = create<LearningState>()(persist((set, get) => ({
     }
 
     const skillStates = ensureSkillStates(session.skillStatesAtEnd)
+    const answeredCount = session.answers.length
+    const resumeIndex = Math.max(session.currentQuestionIndex ?? 0, answeredCount)
+    const resumedSkill = session.currentSkillType ?? session.answers.at(-1)?.skillType ?? null
     set({
       skillStates,
       bktState: bktStateFromSkillStates(skillStates),
+      questionHistory: session.answers,
+      fadingHistory: session.fadingHistory,
       completedSkills: session.completedSkillsAtEnd ?? {},
-      activeSkill: null,
-      currentSkillType: null,
+      activeSkill: resumedSkill,
+      currentSkillType: resumedSkill,
+      currentQuestionIndex: resumeIndex,
+      sessionStartTime: session.sessionId,
+      pendingAnswerRecord: null,
       fadingStage: session.fadingStageAtEnd,
       abilityLevel: session.abilityLevelAtEnd,
     })

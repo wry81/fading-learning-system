@@ -10,6 +10,8 @@ export function persistCurrentSession(): Session | null {
   const session: Session = {
     sessionId: state.sessionStartTime,
     date: new Date(state.sessionStartTime).toISOString(),
+    currentQuestionIndex: state.currentQuestionIndex,
+    currentSkillType: state.currentSkillType,
     answers: state.questionHistory,
     fadingHistory: state.fadingHistory,
     abilityLevelAtEnd: state.abilityLevel,

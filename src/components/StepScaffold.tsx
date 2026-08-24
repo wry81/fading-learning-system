@@ -46,6 +46,9 @@ export type StepScaffoldProps = {
 const inputClass =
   'h-10 min-w-[90px] rounded-xl border border-[#9F9DF3] bg-white px-3 text-center text-l3 text-[#2D2D2D] outline-none focus:border-[#6353AC] focus:ring-2 focus:ring-[#9F9DF3]/30'
 
+const NO_SUPPORT_MESSAGE = '这一阶段不提供提示，请再仔细读一读题目，继续独立思考。'
+const INCORRECT_CHECK_PREFIX = '还没有全部填对，请根据下面的提示再检查一下。'
+
 function escalateStage(stage: FadingStage): FadingStage | null {
   if (stage === 'none') return 'minimal'
   if (stage === 'minimal') return 'partial'
@@ -159,8 +162,17 @@ export default function StepScaffold({
   const effectiveStages = escalatedStages.map((stage) => stage ?? initialSupportLevel)
 
   const displayedHintText = useCallback(
-    (text: string, stage: FadingStage) =>
-      condition === 'fading' && stage === 'minimal' ? firstSentenceZh(text) : text,
+    (text: string, stage: FadingStage) => {
+      if (condition === 'fading' && stage === 'none') return NO_SUPPORT_MESSAGE
+      if (condition === 'fading' && stage === 'minimal') {
+        const feedbackPrefix = `${INCORRECT_CHECK_PREFIX}\n`
+        if (text.startsWith(feedbackPrefix)) {
+          return `${INCORRECT_CHECK_PREFIX}\n${firstSentenceZh(text.slice(feedbackPrefix.length))}`
+        }
+        return firstSentenceZh(text)
+      }
+      return text
+    },
     [condition],
   )
 
@@ -181,8 +193,8 @@ export default function StepScaffold({
       source: HintExposureRecord['source'],
       generatedAt = Date.now(),
     ) => {
+      if (stage === 'none' || !text.trim()) return
       const visibleText = displayedHintText(text, stage).trim()
-      if (!visibleText) return
       hintExposuresRef.current.push({
         step,
         supportLevel: stage,
@@ -259,30 +271,34 @@ export default function StepScaffold({
                   condition,
                 )
           } else {
-            hint = step1Values.every((value) => !value.trim())
-              ? EMPTY_CHECK_HINT
-              : await generateStep1Hint(
-                  question,
-                  stage,
-                  step1Values,
-                  checkHintInputs(step1Values, expected),
-                  condition,
-                )
+            const correctness = checkHintInputs(step1Values, expected)
+            if (step1Values.every((value) => !value.trim())) {
+              hint = EMPTY_CHECK_HINT
+            } else {
+              hint = await generateStep1Hint(
+                question, stage, step1Values, correctness, condition,
+              )
+              if (stage !== 'none' && !correctness.every(Boolean)) {
+                hint = `${INCORRECT_CHECK_PREFIX}\n${hint}`
+              }
+            }
           }
         } else if (step === 2) {
           if (!checking) {
             hint = await generateStep2InitialHint(question, stage, condition)
           } else {
             const expected = ['1', String(question.factor), String(expectedParts)]
-            hint = step2Values.every((value) => !value.trim())
-              ? EMPTY_CHECK_HINT
-              : await generateStep2Hint(
-                  question,
-                  stage,
-                  step2Values,
-                  checkHintInputs(step2Values, expected),
-                  condition,
-                )
+            const correctness = checkHintInputs(step2Values, expected)
+            if (step2Values.every((value) => !value.trim())) {
+              hint = EMPTY_CHECK_HINT
+            } else {
+              hint = await generateStep2Hint(
+                question, stage, step2Values, correctness, condition,
+              )
+              if (stage !== 'none' && !correctness.every(Boolean)) {
+                hint = `${INCORRECT_CHECK_PREFIX}\n${hint}`
+              }
+            }
           }
         } else {
           hint = await generateStep3Hint(question, stage, condition)

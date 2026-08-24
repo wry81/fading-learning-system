@@ -131,6 +131,9 @@ export interface FadingEvent {
 export interface Session {
   sessionId: number
   date: string
+  /** Resume position for an interrupted intervention session. */
+  currentQuestionIndex?: number
+  currentSkillType?: SkillType | null
   answers: AnswerRecord[]
   fadingHistory: FadingEvent[]
   abilityLevelAtEnd: number

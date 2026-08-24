@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { detectCondition, useParticipantStore } from '../store/participantStore'
 import { useLearningStore } from '../store/learningStore'
+import { persistCurrentSession } from '../utils/sessionPersistence'
 import type { StudyCondition } from '../types'
 
 function formatDate(iso: string) {
@@ -68,17 +69,32 @@ export default function Login() {
     setCondition(p.condition)
     initBKT(0)
     startLearningSession()
+    persistCurrentSession()
     navigate('/tutorial')
   }
 
   const startReturning = (id: string) => {
     const p = getParticipant(id)
+    const activeState = useLearningStore.getState()
     if (p) {
       setCondition(p.condition)
-      restoreFromSession(p.sessions.at(-1) ?? null)
+      const isCurrentInterruptedSession =
+        activeState.currentParticipantId === id && activeState.sessionStartTime != null
+      if (isCurrentInterruptedSession) {
+        activeState.setCurrentQuestionIndex(
+          Math.max(activeState.currentQuestionIndex, activeState.questionHistory.length),
+        )
+      } else {
+        const latestSession = p.sessions.at(-1) ?? null
+        if (latestSession) {
+          restoreFromSession(latestSession)
+        } else {
+          startLearningSession()
+        }
+      }
     }
     setCurrentParticipantId(id)
-    startLearningSession()
+    persistCurrentSession()
     navigate('/home')
   }
 
